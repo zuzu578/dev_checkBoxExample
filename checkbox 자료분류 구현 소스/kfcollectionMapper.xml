@@ -1,0 +1,2218 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="egovframework.ag.homepage.kofacollection.service.KfCollectionDao">
+	
+	<select id="selectColName"  parameterType="hashMap" resultType="collectionList">
+		SELECT 
+			kc.COL_ID AS colId
+			,kc.COL_NAME AS colName
+			,k2.UPPER_COL_ID AS upperColId
+		FROM 
+			KMDB.KMDB_COLLECTIONS kc 
+			LEFT OUTER JOIN KMDB.KMDB_COLLECTIONS_UPPER K2 ON KC.COL_ID = K2.COL_ID
+
+		WHERE
+			K2.COL_DEPTH = '1'
+		<if test='upperColId != null and upperColId != ""'>
+		AND
+			K2.UPPER_COL_ID = #{upperColId}
+		</if>
+	</select> 
+	
+	
+	
+	<select id="selectNewName" parameterType="hashMap"  resultType="collectionList">
+	SELECT * FROM
+		((SELECT  	
+			a.COL_NAME AS colName
+			,a.COL_ID AS col_Id 
+			,a.LAST_UPD_DATE AS adjustDate
+		FROM 
+			 KMDB.KMDB_COLLECTIONS a
+			LEFT OUTER JOIN (SELECT COL_ID, COL_DEPTH FROM KMDB.KMDB_COLLECTIONS_UPPER WHERE COL_DEPTH = '2') c ON a.COL_ID = c.COL_ID
+			)A
+			LEFT OUTER JOIN(SELECT 
+			   DISTINCT 
+			   D.COL_ID
+			   ,COUNT(TA.COL_ID) OVER(PARTITION BY TB.TYPE_CLSS) AS dataCount
+			   FROM KMDB.KMDB_COLLECTIONS_REL D 
+			   LEFT OUTER JOIN(SELECT DISTINCT COL_ID, COL_NAME FROM KMDB.KMDB_COLLECTIONS) TA ON TA.COL_ID = D.COL_ID  
+			   LEFT OUTER JOIN(SELECT DISTINCT COL_ID, REL_ID, TYPE_CLSS FROM KMDB.KMDB_COLLECTIONS_REL) TB ON TB.REL_ID = TA.COL_ID) F ON  A.COL_ID=F.COL_ID)
+		WHERE 
+		
+	
+			ROWNUM BETWEEN 1 AND 4
+		ORDER BY a.adjustDate DESC
+	</select>
+
+	<select id="selectBestName" parameterType="hashMap"  resultType="collectionList">
+		SELECT * FROM
+		((SELECT DISTINCT 
+			TB.COL_NAME AS title
+			,a.COL_NAME AS colName
+			,a.COL_ID AS COL_ID 
+			,c.COL_DEPTH
+			,a.ADJUST_DATE AS adjustDate
+			,a.RECOMMEND_YN AS recommendYn
+		
+			FROM 
+			KMDB.KMDB_COLLECTIONS a 
+			LEFT OUTER JOIN (SELECT COL_ID, COL_DEPTH, UPPER_COL_ID FROM KMDB.KMDB_COLLECTIONS_UPPER) c ON a.COL_ID = c.COL_ID
+			LEFT OUTER JOIN(SELECT COL_ID, COL_NAME FROM KMDB.KMDB_COLLECTIONS) TB ON TB.COL_ID = c.UPPER_COL_ID
+			)A
+			LEFT OUTER JOIN(SELECT 
+			   DISTINCT 
+			   D.COL_ID
+			   ,COUNT(TA.COL_ID) OVER(PARTITION BY TB.TYPE_CLSS) AS dataCount
+			   FROM KMDB.KMDB_COLLECTIONS_REL D 
+			   LEFT OUTER JOIN(SELECT DISTINCT COL_ID, COL_NAME FROM KMDB.KMDB_COLLECTIONS) TA ON TA.COL_ID = D.COL_ID  
+			   LEFT OUTER JOIN(SELECT DISTINCT COL_ID, REL_ID, TYPE_CLSS FROM KMDB.KMDB_COLLECTIONS_REL) TB ON TB.REL_ID = TA.COL_ID) F ON  A.COL_ID=F.COL_ID)
+		WHERE 
+			recommendYn = '1'
+		AND 
+			COL_DEPTH = 2
+		AND 
+			ROWNUM BETWEEN 1 AND 4
+	</select>
+	
+	<select id="selectKofaGroupDesc" parameterType="hashMap" resultType="collectionList">
+		SELECT 
+			a.COL_ID AS colId
+			,TA.UPPER_COL_ID AS upperColId
+			,TB.COL_NAME AS colName
+			,TB.COL_DESC AS colDesc
+			,TB.COL_NOTE AS colNote
+		FROM 
+			KMDB.KMDB_COLLECTIONS a
+			LEFT OUTER JOIN(SELECT COL_ID, COL_DEPTH, UPPER_COL_ID FROM KMDB.KMDB_COLLECTIONS_UPPER) TA ON TA.COL_ID = A.COL_ID
+			LEFT OUTER JOIN(SELECT COL_ID, COL_NAME, COL_NOTE, COL_DESC FROM KMDB.KMDB_COLLECTIONS) TB ON TB.COL_ID = TA.UPPER_COL_ID
+		WHERE 
+			TA.UPPER_COL_ID = #{upperColId}
+			AND TA.COL_DEPTH = 1
+	</select>
+	
+	<select id="selectDetailAlbumUpdate" parameterType="hashMap" resultType="collectionList">
+		SELECT 
+			b.C_COLLECTION_ID AS collectionId
+			,a.FILE_NAME AS fileName
+			,a.ORG_FILE_NAME as orgFileName
+			,b.C_COLLECTION_TITLE AS title
+			,b.C_UPDATE_TIME AS updateTime
+		FROM 
+			KOREAFILM.TB_COLLECTION_INFO b, KMDB.TB_ONLINE_ARCHIVES a
+		WHERE 
+			b.C_COLLECTION_ID = #{colId}
+		ORDER BY b.C_UPDATE_TIME DESC
+	</select>
+	
+	<select id="selectDetailAlbumAbc" parameterType="hashMap" resultType="collectionList">
+		SELECT 
+			b.C_COLLECTION_ID AS collectionId
+			,a.FILE_NAME AS fileName
+			,a.ORG_FILE_NAME as orgFileName
+			,b.C_COLLECTION_TITLE AS title
+			,b.C_UPDATE_TIME AS updateTime
+		FROM 
+			KOREAFILM.TB_COLLECTION_INFO b, KMDB.TB_ONLINE_ARCHIVES a
+		WHERE 
+			b.C_COLLECTION_ID = #{colId}
+		ORDER BY b.C_COLLECTION_TITLE ASC
+	</select>
+	
+	<select id="selectDetailListUpdate" parameterType="hashMap" resultType="collectionList">
+		SELECT T2.* FROM (
+	        SELECT ROWNUM ROWNO, T1.*
+	            FROM (
+	            SELECT
+	                Distinct
+	                 TB.COL_ID
+	                ,TA.UPPER_COL_ID AS upperColId
+	                ,TB.COL_NAME AS cCollectionTitle
+	                ,A.COL_NAME AS cCollection
+	                ,TA.COL_DEPTH AS colDepth
+	                ,A.ADJUST_DATE AS adjustDate
+	            FROM KMDB.KMDB_COLLECTIONS A
+	                LEFT OUTER JOIN(SELECT COL_ID, COL_DEPTH, UPPER_COL_ID FROM KMDB.KMDB_COLLECTIONS_UPPER) TA ON TA.COL_ID = A.COL_ID
+	                LEFT OUTER JOIN(SELECT COL_ID, COL_NAME FROM KMDB.KMDB_COLLECTIONS) TB ON TB.COL_ID = TA.UPPER_COL_ID
+	            WHERE 1 = 1
+	            AND TB.COL_ID = #{colId}
+	                AND TA.COL_DEPTH = '2'
+	                ORDER BY
+	               COL_ID ASC
+	                ) T1
+	            WHERE ROWNUM between 1 AND 10
+	        ) T2
+        WHERE ROWNO >= 1
+	</select>
+	
+	<select id="selectDetailListAbc" parameterType="hashMap" resultType="collectionList">
+		SELECT 
+			a.C_COLLECTION_ID AS collectionId
+			,a.C_COLLECTION_TITLE AS title
+			,a.C_UPDATE_TIME AS updateTime
+		FROM 
+			KOREAFILM.TB_COLLECTION_INFO a 
+		WHERE 
+			a.C_COLLECTION_ID = #{colId}
+		ORDER BY a.C_COLLECTION_TITLE ASC
+	</select>
+	
+	<select id="selectDetailView" parameterType="hashMap" resultType="collectionList">
+		SELECT
+			TB.UPPER_COL_ID AS upperColId
+			,TB.COL_ID AS colId
+			,A.col_name AS colName
+			,A.col_note AS colNote
+			,A.use_condition AS useCondition
+			,A.col_desc AS colDesc
+		FROM 
+			KMDB_COLLECTIONS A 
+			LEFT OUTER JOIN ( SELECT UPPER_ID, COL_ID, UPPER_COL_ID FROM KMDB_COLLECTIONS_UPPER) TB ON A.COL_ID = TB.COL_ID
+		WHERE 
+			A.COL_ID = #{colId}
+	</select>
+	
+	<select id="selectDataClass" parameterType="hashMap" resultType="collectionList">
+		SELECT * FROM
+		(SELECT DISTINCT
+		T2.COL_ID AS colId,
+		CODE_NM AS codeNm,
+		TYPE_CLSS AS typeClss,
+		
+		CASE WHEN TYPE_CLSS = 'TH' THEN
+			(SELECT DISTINCT
+			THEORY_NM FROM kmdb.KMDB_COLLECTIONS_REL
+			LEFT OUTER JOIN (SELECT THEORY_DETAIL_ID, THEORY_NM FROM kmdb.THEORY_DETAIL, Kmdb.THEORY, kmdb.KMDB_COLLECTIONS_REL
+			WHERE kmdb.THEORY_DETAIL.THEORY_ID=kmdb.THEORY.THEORY_ID) TA
+			ON TO_CHAR(TA.THEORY_DETAIL_ID)= kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+			WHERE TYPE_CLSS = 'TH')
+		
+		WHEN TYPE_CLSS = 'VI' THEN
+			(SELECT DISTINCT
+			TITLES FROM kmdb.KMDB_COLLECTIONS_REL
+			LEFT OUTER JOIN (SELECT VIDEO_DETAIL_ID, TITLES FROM kmdb.VIDEO_DETAIL, Kmdb.VIDEO, kmdb.KMDB_COLLECTIONS_REL WHERE kmdb.VIDEO_DETAIL.VIDEO_ID=kmdb.VIDEO.VIDEO_ID) TA ON TO_CHAR(TA.VIDEO_DETAIL_ID)= kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+			WHERE TYPE_CLSS = 'VI')
+		
+		WHEN TYPE_CLSS = 'VO' THEN
+			(SELECT DISTINCT
+			PUB_TITLE FROM kmdb.KMDB_COLLECTIONS_REL
+			LEFT OUTER JOIN (SELECT PUB_ID, PUB_TITLE FROM kmdb.PUBLICATION, kmdb.KMDB_COLLECTIONS_REL) TA ON TO_CHAR(TA.PUB_ID)= kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+		
+		WHERE TYPE_CLSS = 'VO')
+		
+		WHEN TYPE_CLSS = 'SF' THEN
+			(SELECT DISTINCT
+			STILFM_NM AS DATA_NM
+			FROM kmdb.KMDB_COLLECTIONS_REL
+			LEFT OUTER JOIN (SELECT STILLFILM_ID, STILFM_NM FROM kmdb.STILL_FILM, kmdb.KMDB_COLLECTIONS_REL) TA
+			ON TO_CHAR(TA.STILLFILM_ID)= kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+			WHERE TYPE_CLSS = 'SF' )
+		
+		WHEN TYPE_CLSS = 'SC' THEN
+			(SELECT DISTINCT
+			S_TITLE AS DATA_NM
+			FROM kmdb.KMDB_COLLECTIONS_REL
+			LEFT OUTER JOIN (SELECT SCENARIO_ID, S_TITLE FROM kmdb.SCENARIO, kmdb.KMDB_COLLECTIONS_REL) TA
+			ON TO_CHAR(TA.SCENARIO_ID)= kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+			WHERE TYPE_CLSS = 'SC')
+		
+		WHEN TYPE_CLSS = 'RE' THEN
+			(SELECT DISTINCT
+			TITLE AS DATA_NM
+			FROM kmdb.KMDB_COLLECTIONS_REL
+			LEFT OUTER JOIN (SELECT RECORD_ID, TITLE FROM kmdb.RECORD, kmdb.KMDB_COLLECTIONS_REL) TA
+			ON TO_CHAR(TA.RECORD_ID)= kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+			WHERE TYPE_CLSS ='RE')
+		
+		WHEN TYPE_CLSS = 'PO' THEN
+			(SELECT DISTINCT
+			POST_NAME AS DATA_NM
+			FROM kmdb.KMDB_COLLECTIONS_REL
+			LEFT OUTER JOIN (SELECT POSTER_ID, POST_NAME FROM kmdb.POSTER, kmdb.KMDB_COLLECTIONS_REL) TA
+			ON TO_CHAR(TA.POSTER_ID)= kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+			WHERE TYPE_CLSS ='PO')
+		
+		WHEN TYPE_CLSS = 'NE' THEN
+			(SELECT DISTINCT
+			NEWS_NM AS DATA_NM
+			FROM kmdb.KMDB_COLLECTIONS_REL
+			LEFT OUTER JOIN (SELECT NEWS_ID, NEWS_NM FROM kmdb.NEWS, kmdb.KMDB_COLLECTIONS_REL) TA
+			ON TO_CHAR(TA.NEWS_ID)= kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+			WHERE TYPE_CLSS ='NE')
+		
+		WHEN TYPE_CLSS = 'MU' THEN
+			(SELECT DISTINCT
+			MUL_TITLE AS DATA_NM
+			FROM kmdb.KMDB_COLLECTIONS_REL
+			LEFT OUTER JOIN (SELECT MUL_ID, MUL_TITLE FROM kmdb.MULTI_NEW, kmdb.KMDB_COLLECTIONS_REL) TA
+			ON TO_CHAR(TA.MUL_ID)= kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+			WHERE TYPE_CLSS ='MU')
+		
+		WHEN TYPE_CLSS = 'HA' THEN
+			(SELECT DISTINCT
+			HANDBL_NM AS DATA_NM
+			FROM kmdb.KMDB_COLLECTIONS_REL
+			LEFT OUTER JOIN (SELECT HANDBILL_DETAIL_ID, HANDBL_NM FROM kmdb.HANDBILL_DETAIL, KMDB.HANDBILL ,kmdb.KMDB_COLLECTIONS_REL
+			WHERE kmdb.HANDBILL_DETAIL.HANDBILL_DETAIL_ID=kmdb.HANDBILL.HANDBILL_ID) TA
+			ON TO_CHAR(TA.HANDBILL_DETAIL_ID) = kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+			WHERE TYPE_CLSS ='HA')
+		
+		WHEN TYPE_CLSS = 'CE' THEN
+			(SELECT DISTINCT
+			TITLE AS DATA_NM
+			FROM kmdb.KMDB_COLLECTIONS_REL
+			LEFT OUTER JOIN (SELECT CENSOR_DETAIL_ID, TITLE FROM kmdb.CENSORSHIP_DETAIL, KMDB.CENSORSHIP_ALL ,kmdb.KMDB_COLLECTIONS_REL
+			WHERE kmdb.CENSORSHIP_DETAIL.CENSOR_DETAIL_ID=kmdb.CENSORSHIP_ALL.CENSOR_ALL_ID) TA
+			ON TO_CHAR(TA.CENSOR_DETAIL_ID) = kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+			WHERE TYPE_CLSS ='CE')
+		
+		WHEN TYPE_CLSS = 'BO' THEN
+			(SELECT DISTINCT
+			BOOK_NM AS DATA_NM
+			FROM kmdb.KMDB_COLLECTIONS_REL
+			LEFT OUTER JOIN (SELECT BOOK_DETAIL_ID, BOOK_NM FROM kmdb.BOOK_DETAIL, KMDB.BOOK ,kmdb.KMDB_COLLECTIONS_REL
+			WHERE kmdb.BOOK_DETAIL.BOOK_DETAIL_ID=kmdb.BOOK.BOOK_ID) TA
+			ON TO_CHAR(TA.BOOK_DETAIL_ID) = kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+			WHERE TYPE_CLSS ='BO')
+		
+		WHEN TYPE_CLSS = 'AT' THEN
+			(SELECT DISTINCT
+			C_TITLE AS DATA_NM
+			FROM kmdb.KMDB_COLLECTIONS_REL
+			LEFT OUTER JOIN (SELECT ARTICLE_ID, C_TITLE FROM kmdb.ARTICLE, kmdb.KMDB_COLLECTIONS_REL) TA
+			ON TO_CHAR(TA.ARTICLE_ID)= kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+			WHERE TYPE_CLSS ='AT')
+		
+			ELSE '' END AS dataNm,
+			COUNT(T2.COL_ID) OVER(PARTITION BY T2.TYPE_CLSS) AS DATA_COUNT
+			
+		FROM kmdb.KMDB_COLLECTIONS_REL T2
+			LEFT OUTER JOIN (SELECT COL_ID, COL_NAME FROM kmdb.KMDB_COLLECTIONS) TB ON TB.COL_ID = T2.COL_ID
+			LEFT OUTER JOIN (SELECT CODE_NM ,CODE FROM kmdb.CODEINFO WHERE DIV_ID ='K05') TA ON TA.CODE = T2.TYPE_CLSS
+		
+		GROUP BY col_name , DATA_ID,CODE_NM ,DATA_NO,t2.COL_ID,ADJUST_DATE,TYPE_CLSS,sort1,sort2,sort3,sort4,sort5
+		) TEMP
+		WHERE 1 = 1
+		AND TEMP.colId = #{colId,jdbcType=VARCHAR}
+	</select>
+	
+	<select id="selectDetailDataList" parameterType="hashMap" resultType="collectionList">
+		SELECT T2.* FROM (
+			SELECT ROWNUM ROWNO, T1.* 
+			
+			FROM (
+	 SELECT * FROM 
+     (SELECT DISTINCT
+        DATA_ID AS dataId,
+    	CODE_NM AS codeNm,
+    	DATA_NO AS dataNo,
+    	
+    	t2.COL_ID AS col_id,
+    	col_name AS cCollectionTitle,
+    	ADJUST_DATE AS adjustDate,
+    	TYPE_CLSS AS typeClss,
+    	sort1,
+    	sort2,
+    	sort3,
+    	sort4,
+    	sort5,
+        CASE WHEN TYPE_CLSS = 'TH' THEN
+                (SELECT DISTINCT
+                    THEORY_NM FROM kmdb.KMDB_COLLECTIONS_REL
+                        LEFT OUTER JOIN (SELECT THEORY_DETAIL_ID, THEORY_NM FROM kmdb.THEORY_DETAIL, Kmdb.THEORY, kmdb.KMDB_COLLECTIONS_REL
+                        WHERE kmdb.THEORY_DETAIL.THEORY_ID=kmdb.THEORY.THEORY_ID) TA
+                        ON TO_CHAR(TA.THEORY_DETAIL_ID)= kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+                       
+                WHERE TYPE_CLSS = 'TH')
+              
+            WHEN TYPE_CLSS = 'VI' THEN
+                (SELECT DISTINCT
+                    TITLES FROM kmdb.KMDB_COLLECTIONS_REL
+          
+                        LEFT OUTER JOIN (SELECT VIDEO_DETAIL_ID, TITLES FROM kmdb.VIDEO_DETAIL, Kmdb.VIDEO, kmdb.KMDB_COLLECTIONS_REL WHERE kmdb.VIDEO_DETAIL.VIDEO_ID=kmdb.VIDEO.VIDEO_ID) TA ON TO_CHAR(TA.VIDEO_DETAIL_ID)= kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+                WHERE TYPE_CLSS = 'VI')
+              
+            WHEN TYPE_CLSS = 'VO' THEN
+                (SELECT DISTINCT
+                    PUB_TITLE FROM kmdb.KMDB_COLLECTIONS_REL
+       
+                        LEFT OUTER JOIN (SELECT PUB_ID, PUB_TITLE FROM kmdb.PUBLICATION, kmdb.KMDB_COLLECTIONS_REL) TA ON TO_CHAR(TA.PUB_ID)= kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+               
+                WHERE TYPE_CLSS = 'VO')
+       
+       		<!-- 
+			WHEN TYPE_CLSS  = 'ST' THEN
+                (SELECT
+                    TA.STILL_NM FROM kmdb.KMDB_COLLECTIONS_REL 
+                 
+                        LEFT OUTER JOIN (SELECT STILL_DETAIL_ID, STILL_NM FROM kmdb.STILL_DETAIL, KMDB.STILL ,kmdb.KMDB_COLLECTIONS_REL
+                        WHERE kmdb.STILL_DETAIL.STILL_ID=kmdb.STILL.STILL_ID AND TO_CHAR(STILL_DETAIL_ID) = kmdb.KMDB_COLLECTIONS_REL.DATA_ID) TA on TO_CHAR(STILL_DETAIL_ID) = kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+                    WHERE TYPE_CLSS = 'ST')
+             -->
+                
+             WHEN TYPE_CLSS  = 'SF' THEN 
+ 		 		  (SELECT DISTINCT
+				   STILFM_NM AS DATA_NM
+         			FROM kmdb.KMDB_COLLECTIONS_REL
+                   LEFT OUTER JOIN (SELECT STILLFILM_ID, STILFM_NM FROM kmdb.STILL_FILM, kmdb.KMDB_COLLECTIONS_REL) TA
+               	 ON TO_CHAR(TA.STILLFILM_ID)= kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+               	WHERE TYPE_CLSS = 'SF' )
+               	
+            WHEN TYPE_CLSS  = 'SC' THEN 
+ 				  (SELECT DISTINCT
+         		   S_TITLE AS DATA_NM
+         		   FROM kmdb.KMDB_COLLECTIONS_REL
+                   LEFT OUTER JOIN (SELECT SCENARIO_ID, S_TITLE FROM kmdb.SCENARIO, kmdb.KMDB_COLLECTIONS_REL) TA
+               	   ON TO_CHAR(TA.SCENARIO_ID)= kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+               	   	WHERE TYPE_CLSS = 'SC') 
+               	   	
+           WHEN TYPE_CLSS  = 'RE' THEN 
+ 		        (SELECT DISTINCT
+         		TITLE AS DATA_NM
+         		FROM kmdb.KMDB_COLLECTIONS_REL
+                LEFT OUTER JOIN (SELECT RECORD_ID, TITLE FROM kmdb.RECORD, kmdb.KMDB_COLLECTIONS_REL) TA
+               	 ON TO_CHAR(TA.RECORD_ID)= kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+               	 WHERE TYPE_CLSS ='RE')  
+               	 
+           WHEN TYPE_CLSS  = 'PO' THEN 
+ 		 		(SELECT DISTINCT
+         		 POST_NAME AS DATA_NM
+                 FROM kmdb.KMDB_COLLECTIONS_REL
+                 LEFT OUTER JOIN (SELECT POSTER_ID, POST_NAME FROM kmdb.POSTER, kmdb.KMDB_COLLECTIONS_REL) TA
+               	 ON TO_CHAR(TA.POSTER_ID)= kmdb.KMDB_COLLECTIONS_REL.DATA_ID     
+               	 WHERE TYPE_CLSS ='PO')
+               	 
+           WHEN  TYPE_CLSS  = 'NE' THEN 
+ 				(SELECT DISTINCT
+        		NEWS_NM AS DATA_NM
+        		FROM kmdb.KMDB_COLLECTIONS_REL
+                LEFT OUTER JOIN (SELECT NEWS_ID, NEWS_NM FROM kmdb.NEWS, kmdb.KMDB_COLLECTIONS_REL) TA
+               	ON TO_CHAR(TA.NEWS_ID)= kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+               	WHERE TYPE_CLSS  ='NE')
+               	
+            WHEN TYPE_CLSS  = 'MU' THEN 
+		 			(SELECT DISTINCT
+		     		MUL_TITLE AS DATA_NM
+		         	FROM kmdb.KMDB_COLLECTIONS_REL
+                    LEFT OUTER JOIN (SELECT MUL_ID, MUL_TITLE FROM kmdb.MULTI_NEW, kmdb.KMDB_COLLECTIONS_REL) TA
+               		ON TO_CHAR(TA.MUL_ID)= kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+               		WHERE TYPE_CLSS ='MU')
+               		
+            WHEN TYPE_CLSS  = 'HA' THEN 
+						 (SELECT DISTINCT
+      					  HANDBL_NM AS DATA_NM
+        				  FROM kmdb.KMDB_COLLECTIONS_REL
+                 		  LEFT OUTER JOIN (SELECT HANDBILL_DETAIL_ID, HANDBL_NM FROM kmdb.HANDBILL_DETAIL, KMDB.HANDBILL ,kmdb.KMDB_COLLECTIONS_REL
+                  		  WHERE kmdb.HANDBILL_DETAIL.HANDBILL_DETAIL_ID=kmdb.HANDBILL.HANDBILL_ID) TA
+                  		  ON TO_CHAR(TA.HANDBILL_DETAIL_ID) = kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+                  		  WHERE TYPE_CLSS ='HA')
+                  		  
+            WHEN TYPE_CLSS  = 'CE' THEN 
+ 						  (SELECT DISTINCT
+ 						   TITLE AS DATA_NM
+         				   FROM kmdb.KMDB_COLLECTIONS_REL
+                 		   LEFT OUTER JOIN (SELECT CENSOR_DETAIL_ID, TITLE FROM kmdb.CENSORSHIP_DETAIL, KMDB.CENSORSHIP_ALL ,kmdb.KMDB_COLLECTIONS_REL
+                  		   WHERE kmdb.CENSORSHIP_DETAIL.CENSOR_DETAIL_ID=kmdb.CENSORSHIP_ALL.CENSOR_ALL_ID) TA
+                           ON TO_CHAR(TA.CENSOR_DETAIL_ID) = kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+                           WHERE TYPE_CLSS ='CE')
+                           
+            WHEN TYPE_CLSS   = 'BO' THEN 
+ 						(SELECT DISTINCT
+        			     BOOK_NM AS DATA_NM
+         				 FROM kmdb.KMDB_COLLECTIONS_REL
+                   		 LEFT OUTER JOIN (SELECT BOOK_DETAIL_ID, BOOK_NM FROM kmdb.BOOK_DETAIL, KMDB.BOOK ,kmdb.KMDB_COLLECTIONS_REL
+                  		 WHERE kmdb.BOOK_DETAIL.BOOK_DETAIL_ID=kmdb.BOOK.BOOK_ID) TA
+                  		 ON TO_CHAR(TA.BOOK_DETAIL_ID) = kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+                  		 WHERE TYPE_CLSS ='BO')
+                  		 
+            WHEN TYPE_CLSS   = 'AT' THEN 
+ 				     (SELECT DISTINCT
+					  C_TITLE AS DATA_NM
+         			  FROM kmdb.KMDB_COLLECTIONS_REL
+                   	  LEFT OUTER JOIN (SELECT ARTICLE_ID, C_TITLE FROM kmdb.ARTICLE, kmdb.KMDB_COLLECTIONS_REL) TA
+               	 	  ON TO_CHAR(TA.ARTICLE_ID)= kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+               	 	  WHERE TYPE_CLSS ='AT')
+               	 	  
+               	                       
+                          	 
+            ELSE '' END AS dataNm
+
+    FROM kmdb.KMDB_COLLECTIONS_REL T2
+
+     LEFT OUTER JOIN (SELECT COL_ID, COL_NAME FROM kmdb.KMDB_COLLECTIONS) TB ON TB.COL_ID = T2.COL_ID
+	 LEFT OUTER JOIN (SELECT CODE_NM ,CODE FROM kmdb.CODEINFO WHERE DIV_ID ='K05') TA ON TA.CODE = T2.TYPE_CLSS	) TEMP
+	 
+     WHERE 1 = 1
+			AND TEMP.COL_ID = #{colId,jdbcType=VARCHAR}
+	 
+			) T1
+          WHERE ROWNUM &lt;= #{end}
+		) T2
+		WHERE ROWNO &gt; = #{start}
+      
+	</select>
+	
+	<select id="selectDetailDataListCount" resultType="int" parameterType="String">
+	SELECT COUNT(*)  FROM (
+					SELECT ROWNUM ROWNO, T1.* 
+			FROM ( 
+	 SELECT * FROM 
+     (SELECT DISTINCT
+        DATA_ID AS dataId,
+    	CODE_NM AS codeNm,
+    	DATA_NO AS dataNo,
+    	
+    	t2.COL_ID AS col_id,
+    	col_name AS cCollectionTitle,
+    	ADJUST_DATE AS adjustDate,
+    	TYPE_CLSS,
+    	sort1,
+    	sort2,
+    	sort3,
+    	sort4,
+    	sort5,
+        CASE WHEN TYPE_CLSS = 'TH' THEN
+                (SELECT DISTINCT
+                    THEORY_NM FROM kmdb.KMDB_COLLECTIONS_REL
+                        LEFT OUTER JOIN (SELECT THEORY_DETAIL_ID, THEORY_NM FROM kmdb.THEORY_DETAIL, Kmdb.THEORY, kmdb.KMDB_COLLECTIONS_REL
+                        WHERE kmdb.THEORY_DETAIL.THEORY_ID=kmdb.THEORY.THEORY_ID) TA
+                        ON TO_CHAR(TA.THEORY_DETAIL_ID)= kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+                       
+                WHERE TYPE_CLSS = 'TH')
+              
+            WHEN TYPE_CLSS = 'VI' THEN
+                (SELECT DISTINCT
+                    TITLES FROM kmdb.KMDB_COLLECTIONS_REL
+          
+                        LEFT OUTER JOIN (SELECT VIDEO_DETAIL_ID, TITLES FROM kmdb.VIDEO_DETAIL, Kmdb.VIDEO, kmdb.KMDB_COLLECTIONS_REL WHERE kmdb.VIDEO_DETAIL.VIDEO_ID=kmdb.VIDEO.VIDEO_ID) TA ON TO_CHAR(TA.VIDEO_DETAIL_ID)= kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+                WHERE TYPE_CLSS = 'VI')
+              
+            WHEN TYPE_CLSS = 'VO' THEN
+                (SELECT DISTINCT
+                    PUB_TITLE FROM kmdb.KMDB_COLLECTIONS_REL
+       
+                        LEFT OUTER JOIN (SELECT PUB_ID, PUB_TITLE FROM kmdb.PUBLICATION, kmdb.KMDB_COLLECTIONS_REL) TA ON TO_CHAR(TA.PUB_ID)= kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+               
+                WHERE TYPE_CLSS = 'VO')
+       
+<!-- 
+			WHEN TYPE_CLSS  = 'ST' THEN
+                (SELECT
+                    TA.STILL_NM FROM kmdb.KMDB_COLLECTIONS_REL 
+                 
+                        LEFT OUTER JOIN (SELECT STILL_DETAIL_ID, STILL_NM FROM kmdb.STILL_DETAIL, KMDB.STILL ,kmdb.KMDB_COLLECTIONS_REL
+                        WHERE kmdb.STILL_DETAIL.STILL_ID=kmdb.STILL.STILL_ID AND TO_CHAR(STILL_DETAIL_ID) = kmdb.KMDB_COLLECTIONS_REL.DATA_ID) TA on TO_CHAR(STILL_DETAIL_ID) = kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+                    WHERE TYPE_CLSS = 'ST')
+             -->
+                
+             WHEN TYPE_CLSS  = 'SF' THEN 
+ 		 		  (SELECT DISTINCT
+				   STILFM_NM AS DATA_NM
+         			FROM kmdb.KMDB_COLLECTIONS_REL
+                   LEFT OUTER JOIN (SELECT STILLFILM_ID, STILFM_NM FROM kmdb.STILL_FILM, kmdb.KMDB_COLLECTIONS_REL) TA
+               	 ON TO_CHAR(TA.STILLFILM_ID)= kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+               	WHERE TYPE_CLSS = 'SF' )
+               	
+            WHEN TYPE_CLSS  = 'SC' THEN 
+ 				  (SELECT DISTINCT
+         		   S_TITLE AS DATA_NM
+         		   FROM kmdb.KMDB_COLLECTIONS_REL
+                   LEFT OUTER JOIN (SELECT SCENARIO_ID, S_TITLE FROM kmdb.SCENARIO, kmdb.KMDB_COLLECTIONS_REL) TA
+               	   ON TO_CHAR(TA.SCENARIO_ID)= kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+               	   	WHERE TYPE_CLSS = 'SC') 
+               	   	
+           WHEN TYPE_CLSS  = 'RE' THEN 
+ 		        (SELECT DISTINCT
+         		TITLE AS DATA_NM
+         		FROM kmdb.KMDB_COLLECTIONS_REL
+                LEFT OUTER JOIN (SELECT RECORD_ID, TITLE FROM kmdb.RECORD, kmdb.KMDB_COLLECTIONS_REL) TA
+               	 ON TO_CHAR(TA.RECORD_ID)= kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+               	 WHERE TYPE_CLSS ='RE')  
+               	 
+           WHEN TYPE_CLSS  = 'PO' THEN 
+ 		 		(SELECT DISTINCT
+         		 POST_NAME AS DATA_NM
+                 FROM kmdb.KMDB_COLLECTIONS_REL
+                 LEFT OUTER JOIN (SELECT POSTER_ID, POST_NAME FROM kmdb.POSTER, kmdb.KMDB_COLLECTIONS_REL) TA
+               	 ON TO_CHAR(TA.POSTER_ID)= kmdb.KMDB_COLLECTIONS_REL.DATA_ID     
+               	 WHERE TYPE_CLSS ='PO')
+               	 
+           WHEN  TYPE_CLSS  = 'NE' THEN 
+ 				(SELECT DISTINCT
+        		NEWS_NM AS DATA_NM
+        		FROM kmdb.KMDB_COLLECTIONS_REL
+                LEFT OUTER JOIN (SELECT NEWS_ID, NEWS_NM FROM kmdb.NEWS, kmdb.KMDB_COLLECTIONS_REL) TA
+               	ON TO_CHAR(TA.NEWS_ID)= kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+               	WHERE TYPE_CLSS  ='NE')
+               	
+            WHEN TYPE_CLSS  = 'MU' THEN 
+		 			(SELECT DISTINCT
+		     		MUL_TITLE AS DATA_NM
+		         	FROM kmdb.KMDB_COLLECTIONS_REL
+                    LEFT OUTER JOIN (SELECT MUL_ID, MUL_TITLE FROM kmdb.MULTI_NEW, kmdb.KMDB_COLLECTIONS_REL) TA
+               		ON TO_CHAR(TA.MUL_ID)= kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+               		WHERE TYPE_CLSS ='MU')
+               		
+            WHEN TYPE_CLSS  = 'HA' THEN 
+						 (SELECT DISTINCT
+      					  HANDBL_NM AS DATA_NM
+        				  FROM kmdb.KMDB_COLLECTIONS_REL
+                 		  LEFT OUTER JOIN (SELECT HANDBILL_DETAIL_ID, HANDBL_NM FROM kmdb.HANDBILL_DETAIL, KMDB.HANDBILL ,kmdb.KMDB_COLLECTIONS_REL
+                  		  WHERE kmdb.HANDBILL_DETAIL.HANDBILL_DETAIL_ID=kmdb.HANDBILL.HANDBILL_ID) TA
+                  		  ON TO_CHAR(TA.HANDBILL_DETAIL_ID) = kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+                  		  WHERE TYPE_CLSS ='HA')
+                  		  
+            WHEN TYPE_CLSS  = 'CE' THEN 
+ 						  (SELECT DISTINCT
+ 						   TITLE AS DATA_NM
+         				   FROM kmdb.KMDB_COLLECTIONS_REL
+                 		   LEFT OUTER JOIN (SELECT CENSOR_DETAIL_ID, TITLE FROM kmdb.CENSORSHIP_DETAIL, KMDB.CENSORSHIP_ALL ,kmdb.KMDB_COLLECTIONS_REL
+                  		   WHERE kmdb.CENSORSHIP_DETAIL.CENSOR_DETAIL_ID=kmdb.CENSORSHIP_ALL.CENSOR_ALL_ID) TA
+                           ON TO_CHAR(TA.CENSOR_DETAIL_ID) = kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+                           WHERE TYPE_CLSS ='CE')
+                           
+            WHEN TYPE_CLSS   = 'BO' THEN 
+ 						(SELECT DISTINCT
+        			     BOOK_NM AS DATA_NM
+         				 FROM kmdb.KMDB_COLLECTIONS_REL
+                   		 LEFT OUTER JOIN (SELECT BOOK_DETAIL_ID, BOOK_NM FROM kmdb.BOOK_DETAIL, KMDB.BOOK ,kmdb.KMDB_COLLECTIONS_REL
+                  		 WHERE kmdb.BOOK_DETAIL.BOOK_DETAIL_ID=kmdb.BOOK.BOOK_ID) TA
+                  		 ON TO_CHAR(TA.BOOK_DETAIL_ID) = kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+                  		 WHERE TYPE_CLSS ='BO')
+                  		 
+            WHEN TYPE_CLSS   = 'AT' THEN 
+ 				     (SELECT DISTINCT
+					  C_TITLE AS DATA_NM
+         			  FROM kmdb.KMDB_COLLECTIONS_REL
+                   	  LEFT OUTER JOIN (SELECT ARTICLE_ID, C_TITLE FROM kmdb.ARTICLE, kmdb.KMDB_COLLECTIONS_REL) TA
+               	 	  ON TO_CHAR(TA.ARTICLE_ID)= kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+               	 	  WHERE TYPE_CLSS ='AT')
+               	 	  
+               	                       
+                          	 
+            ELSE '' END AS dataNm
+
+    FROM kmdb.KMDB_COLLECTIONS_REL T2
+
+     LEFT OUTER JOIN (SELECT COL_ID, COL_NAME FROM kmdb.KMDB_COLLECTIONS) TB ON TB.COL_ID = T2.COL_ID
+	 LEFT OUTER JOIN (SELECT CODE_NM ,CODE FROM kmdb.CODEINFO WHERE DIV_ID ='K05') TA ON TA.CODE = T2.TYPE_CLSS	) TEMP
+	 
+     WHERE 1 = 1
+			AND TEMP.COL_ID = #{colId,jdbcType=VARCHAR}
+		 ) T1
+          
+        ) T2
+	</select>
+	
+	<select id="defaultListCount" resultType="int" parameterType="String">
+		    SELECT COUNT(*)  FROM (
+         	SELECT
+					DISTINCT
+					c.UPPER_COL_ID
+					,a.COL_ID
+					,TB.COL_NAME AS cCollectionTitle
+					,a.COL_NAME AS cCollection
+					,c.COL_DEPTH
+					,a.CREATE_ID 
+					,a.CREATE_DATE 
+					,a.ADJUST_ID 
+					,a.ADJUST_DATE  
+				FROM 
+					KMDB.KMDB_COLLECTIONS a
+					LEFT OUTER JOIN (SELECT COL_ID, COL_DEPTH, UPPER_COL_ID FROM KMDB.KMDB_COLLECTIONS_UPPER) c ON a.COL_ID = c.COL_ID
+					LEFT OUTER JOIN(SELECT COL_ID, COL_NAME FROM KMDB.KMDB_COLLECTIONS) TB ON TB.COL_ID = c.UPPER_COL_ID
+				WHERE 
+				c.COL_DEPTH = 2
+				AND c.UPPER_COL_ID =  #{upperColId}
+					 
+				       ORDER BY 
+				       a.COL_NAME ASC
+          )
+	</select>
+	
+	<select id="getDataByIdxEtcCount" resultType="int" parameterType="String">
+	SELECT COUNT(*)  FROM (
+         	SELECT
+					DISTINCT
+					c.UPPER_COL_ID
+					,a.COL_ID
+					,TB.COL_NAME AS cCollectionTitle
+					,a.COL_NAME AS cCollection
+					,c.COL_DEPTH
+					,a.CREATE_ID 
+					,a.CREATE_DATE 
+					,a.ADJUST_ID 
+					,a.ADJUST_DATE  
+				FROM 
+					KMDB.KMDB_COLLECTIONS a
+					LEFT OUTER JOIN (SELECT COL_ID, COL_DEPTH, UPPER_COL_ID FROM KMDB.KMDB_COLLECTIONS_UPPER) c ON a.COL_ID = c.COL_ID
+					LEFT OUTER JOIN(SELECT COL_ID, COL_NAME FROM KMDB.KMDB_COLLECTIONS) TB ON TB.COL_ID = c.UPPER_COL_ID
+				WHERE 
+				c.COL_DEPTH = 2
+				AND c.UPPER_COL_ID = #{upperColId}  
+				AND REGEXP_LIKE (a.COL_NAME, '^[A-Za-z0-9].*')
+				       ORDER BY 
+				       a.COL_NAME ASC
+          )
+	</select>
+	<select id="getDataByIdxCount" resultType="int" parameterType="String">
+		SELECT COUNT(*)  FROM (
+         	SELECT
+					DISTINCT
+					c.UPPER_COL_ID
+					,a.COL_ID
+					,TB.COL_NAME AS cCollectionTitle
+					,a.COL_NAME AS cCollection
+					,c.COL_DEPTH
+					,a.CREATE_ID 
+					,a.CREATE_DATE 
+					,a.ADJUST_ID 
+					,a.ADJUST_DATE  
+				FROM 
+					KMDB.KMDB_COLLECTIONS a
+					LEFT OUTER JOIN (SELECT COL_ID, COL_DEPTH, UPPER_COL_ID FROM KMDB.KMDB_COLLECTIONS_UPPER) c ON a.COL_ID = c.COL_ID
+					LEFT OUTER JOIN(SELECT COL_ID, COL_NAME FROM KMDB.KMDB_COLLECTIONS) TB ON TB.COL_ID = c.UPPER_COL_ID
+				WHERE 
+				c.COL_DEPTH = 2
+				AND c.UPPER_COL_ID =  #{upperColId} 
+				 AND CASE WHEN a.COL_NAME &lt; 'ㄱ' then SUBSTR(a.COL_NAME, 1, 1)
+				                WHEN ascii('ㄱ') &lt;= ascii(a.COL_NAME)
+				        AND ascii(a.COL_NAME) &lt;= ascii('ㅎ') THEN a.COL_NAME
+				                WHEN a.COL_NAME &lt; '나' THEN 'ㄱ'
+				                WHEN a.COL_NAME &lt; '다' THEN 'ㄴ'
+				                WHEN a.COL_NAME &lt; '라' THEN 'ㄷ'
+				                WHEN a.COL_NAME &lt; '마' THEN 'ㄹ'
+				                WHEN a.COL_NAME &lt; '바' THEN 'ㅁ'
+				                WHEN a.COL_NAME &lt; '사' THEN 'ㅂ'
+				                WHEN a.COL_NAME &lt; '아' THEN 'ㅅ'
+				                WHEN a.COL_NAME &lt; '자' THEN 'ㅇ'
+				                WHEN a.COL_NAME &lt; '차' THEN 'ㅈ'
+				                WHEN a.COL_NAME &lt; '카' THEN 'ㅊ'
+				                WHEN a.COL_NAME &lt; '타' THEN 'ㅋ'
+				                WHEN a.COL_NAME &lt; '파' THEN 'ㅌ'
+				                WHEN a.COL_NAME &lt; '하' THEN 'ㅍ'
+				                ELSE 'ㅎ'
+				        END = #{idx}
+				        
+          )
+	</select>
+	
+	<select id="getDataByIdxEtc" resultType="collectionList" parameterType="HashMap">
+	
+				SELECT T2.* FROM (
+			SELECT ROWNUM ROWNO, T1.* 
+				FROM (SELECT * FROM
+						((SELECT
+						DISTINCT
+						c.UPPER_COL_ID
+						,a.COL_ID
+						,TB.COL_NAME AS cCollectionTitle
+						,a.COL_NAME AS cCollection
+						,c.COL_DEPTH
+						,a.CREATE_ID 
+						,a.CREATE_DATE 
+						,a.ADJUST_ID 
+						,a.ADJUST_DATE  
+					FROM 
+						KMDB.KMDB_COLLECTIONS a
+						LEFT OUTER JOIN (SELECT COL_ID, COL_DEPTH, UPPER_COL_ID FROM KMDB.KMDB_COLLECTIONS_UPPER) c ON a.COL_ID = c.COL_ID
+						LEFT OUTER JOIN(SELECT COL_ID, COL_NAME FROM KMDB.KMDB_COLLECTIONS) TB ON TB.COL_ID = c.UPPER_COL_ID
+					    ) A
+					    LEFT OUTER JOIN(SELECT 
+			   DISTINCT 
+			   D.COL_ID
+			   ,COUNT(TA.COL_ID) OVER(PARTITION BY TB.TYPE_CLSS) AS DATA_COUNT
+			   FROM KMDB.KMDB_COLLECTIONS_REL D 
+			   LEFT OUTER JOIN(SELECT DISTINCT COL_ID, COL_NAME FROM KMDB.KMDB_COLLECTIONS) TA ON TA.COL_ID = D.COL_ID  
+			   LEFT OUTER JOIN(SELECT DISTINCT COL_ID, REL_ID, TYPE_CLSS FROM KMDB.KMDB_COLLECTIONS_REL) TB ON TB.REL_ID = TA.COL_ID) F ON  A.COL_ID=F.COL_ID)
+			   
+			   WHERE 
+						COL_DEPTH = 2
+						AND UPPER_COL_ID = #{upperColId}
+						<if test='idx.equals("etc")'> 
+						AND REGEXP_LIKE (cCollection, '^[A-Za-z0-9].*')
+						</if>
+					    <if test="sortMethod.equals('') ">
+				       ORDER BY 
+				       cCollection ASC
+				       </if>
+				           <if test="sortMethod.equals('adjustDateDesc')">
+				       ORDER BY 
+				       ADJUST_DATE DESC 
+				       </if>
+				           <if test="sortMethod.equals('titleAsc')">
+				       ORDER BY 
+				       cCollection ASC
+				       </if>
+				       ) T1
+					    WHERE ROWNUM &lt;= #{end}
+		) T2
+		WHERE ROWNO &gt; = #{start}
+	
+	</select>
+	
+	
+	
+	<select id="getDataByIdx" resultType="collectionList" parameterType="HashMap">
+		SELECT T2.* FROM (
+			SELECT ROWNUM ROWNO, T1.* 
+				FROM (SELECT * FROM
+						((SELECT
+					DISTINCT
+					b.UPPER_COL_ID
+					,a.COL_ID
+					,TB.COL_NAME AS cCollectionTitle
+					,a.COL_NAME AS cCollection
+					,b.COL_DEPTH
+					,a.CREATE_ID 
+					,a.CREATE_DATE 
+					,a.ADJUST_ID 
+					,a.ADJUST_DATE  
+				FROM 
+					KMDB.KMDB_COLLECTIONS a
+					LEFT OUTER JOIN (SELECT COL_ID, COL_DEPTH, UPPER_COL_ID FROM KMDB.KMDB_COLLECTIONS_UPPER) b ON a.COL_ID = b.COL_ID
+					LEFT OUTER JOIN(SELECT COL_ID, COL_NAME FROM KMDB.KMDB_COLLECTIONS) TB ON TB.COL_ID = b.UPPER_COL_ID
+					) C	
+					 LEFT OUTER JOIN(SELECT 
+			   DISTINCT 
+			   D.COL_ID
+			   ,COUNT(TA.COL_ID) OVER(PARTITION BY TB.TYPE_CLSS) AS DATA_COUNT
+			   FROM KMDB.KMDB_COLLECTIONS_REL D 
+			   LEFT OUTER JOIN(SELECT DISTINCT COL_ID, COL_NAME FROM KMDB.KMDB_COLLECTIONS) TA ON TA.COL_ID = D.COL_ID  
+			   LEFT OUTER JOIN(SELECT DISTINCT COL_ID, REL_ID, TYPE_CLSS FROM KMDB.KMDB_COLLECTIONS_REL) TB ON TB.REL_ID = TA.COL_ID) F ON  C.COL_ID=F.COL_ID)
+				WHERE COL_DEPTH = 2
+				AND UPPER_COL_ID = #{upperColId}
+				AND CASE WHEN cCollection &lt; 'ㄱ' then SUBSTR(cCollection, 1, 1)
+				                WHEN ascii('ㄱ') &lt;= ascii(cCollection)
+				        AND ascii(cCollection) &lt;= ascii('ㅎ') THEN cCollection
+				                WHEN cCollection &lt; '나' THEN 'ㄱ'
+				                WHEN cCollection &lt; '다' THEN 'ㄴ'
+				                WHEN cCollection &lt; '라' THEN 'ㄷ'
+				                WHEN cCollection &lt; '마' THEN 'ㄹ'
+				                WHEN cCollection &lt; '바' THEN 'ㅁ'
+				                WHEN cCollection &lt; '사' THEN 'ㅂ'
+				                WHEN cCollection &lt; '아' THEN 'ㅅ'
+				                WHEN cCollection &lt; '자' THEN 'ㅇ'
+				                WHEN cCollection &lt; '차' THEN 'ㅈ'
+				                WHEN cCollection &lt; '카' THEN 'ㅊ'
+				                WHEN cCollection &lt; '타' THEN 'ㅋ'
+				                WHEN cCollection &lt; '파' THEN 'ㅌ'
+				                WHEN cCollection &lt; '하' THEN 'ㅍ'
+				                ELSE 'ㅎ'
+				        END = #{idx}
+				       <if test="sortMethod.equals('') ">
+				       ORDER BY 
+				       cCollection ASC
+				       </if>
+				           <if test="sortMethod.equals('adjustDateDesc')">
+				       ORDER BY 
+				       ADJUST_DATE DESC 
+				       </if>
+				           <if test="sortMethod.equals('titleAsc')">
+				       ORDER BY 
+				       cCollection ASC
+				       </if>
+						) T1
+			WHERE ROWNUM &lt;= #{end}
+		) T2
+		WHERE ROWNO &gt; = #{start}
+	
+	</select>
+	
+	<select id="getDataByIdxAll" resultType="collectionList" parameterType="HashMap">
+		SELECT T2.* FROM (
+			SELECT ROWNUM ROWNO, T1.* 
+				FROM (SELECT * FROM
+						((SELECT
+					DISTINCT
+					b.UPPER_COL_ID
+					,a.COL_ID
+					,TB.COL_NAME AS cCollectionTitle
+					,a.COL_NAME AS cCollection
+					,b.COL_DEPTH
+					,a.CREATE_ID 
+					,a.CREATE_DATE 
+					,a.ADJUST_ID 
+					,a.ADJUST_DATE  
+				FROM 
+					KMDB.KMDB_COLLECTIONS a
+					LEFT OUTER JOIN (SELECT COL_ID, COL_DEPTH, UPPER_COL_ID FROM KMDB.KMDB_COLLECTIONS_UPPER) b ON a.COL_ID = b.COL_ID
+					LEFT OUTER JOIN(SELECT COL_ID, COL_NAME FROM KMDB.KMDB_COLLECTIONS) TB ON TB.COL_ID = b.UPPER_COL_ID
+					) C	
+					 LEFT OUTER JOIN(SELECT 
+			   DISTINCT 
+			   D.COL_ID
+			   ,COUNT(TA.COL_ID) OVER(PARTITION BY TB.TYPE_CLSS) AS DATA_COUNT
+			   FROM KMDB.KMDB_COLLECTIONS_REL D 
+			   LEFT OUTER JOIN(SELECT DISTINCT COL_ID, COL_NAME FROM KMDB.KMDB_COLLECTIONS) TA ON TA.COL_ID = D.COL_ID  
+			   LEFT OUTER JOIN(SELECT DISTINCT COL_ID, REL_ID, TYPE_CLSS FROM KMDB.KMDB_COLLECTIONS_REL) TB ON TB.REL_ID = TA.COL_ID) F ON  C.COL_ID=F.COL_ID)
+				WHERE COL_DEPTH = 2
+				AND UPPER_COL_ID = #{upperColId}
+				
+				       <if test="sortMethod.equals('') ">
+				       ORDER BY 
+				       cCollection ASC
+				       </if>
+				           <if test="sortMethod.equals('adjustDateDesc')">
+				       ORDER BY 
+				       ADJUST_DATE DESC 
+				       </if>
+				           <if test="sortMethod.equals('titleAsc')">
+				       ORDER BY 
+				       cCollection ASC
+				       </if>
+						) T1
+			WHERE ROWNUM &lt;= #{end}
+		) T2
+		WHERE ROWNO &gt; = #{start}
+	
+	</select>
+
+		<select id="totalDataCount" resultType="int" parameterType="java.util.HashMap">
+	SELECT COUNT(*) AS TOTAL_COUNT FROM (
+	    	SELECT DISTINCT
+	        DATA_ID AS dataId
+	    	,CODE_NM AS codeNm
+	    	,SUBJECT AS subject
+	    	,t2.COL_ID AS col_id
+	    	,col_name AS cCollectionKofaGroupTitle
+	    	,CREATE_DATE AS createDate
+	    	,description AS description
+	    	,DATA_NO AS dataNo
+	    	,sort1
+	    	,sort2
+	    	,sort3
+	    	,sort4
+	    	,sort5
+	        ,CASE WHEN TYPE_CLSS = 'TH' THEN
+	                (SELECT DISTINCT
+	                    THEORY_NM FROM kmdb.KMDB_COLLECTIONS_REL
+	                        LEFT OUTER JOIN (SELECT THEORY_DETAIL_ID, THEORY_NM FROM kmdb.THEORY_DETAIL, Kmdb.THEORY, kmdb.KMDB_COLLECTIONS_REL
+	                        WHERE kmdb.THEORY_DETAIL.THEORY_ID=kmdb.THEORY.THEORY_ID) TA
+	                        ON TO_CHAR(TA.THEORY_DETAIL_ID)= kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+	                       
+	                WHERE TYPE_CLSS = 'TH')
+	              
+	            WHEN TYPE_CLSS = 'VI' THEN
+	                (SELECT DISTINCT
+	                    TITLES FROM kmdb.KMDB_COLLECTIONS_REL
+	          
+	                        LEFT OUTER JOIN (SELECT VIDEO_DETAIL_ID, TITLES FROM kmdb.VIDEO_DETAIL, Kmdb.VIDEO, kmdb.KMDB_COLLECTIONS_REL WHERE kmdb.VIDEO_DETAIL.VIDEO_ID=kmdb.VIDEO.VIDEO_ID) TA ON TO_CHAR(TA.VIDEO_DETAIL_ID)= kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+	                WHERE TYPE_CLSS = 'VI')
+	              
+	            WHEN TYPE_CLSS = 'VO' THEN
+	                (SELECT DISTINCT
+	                    PUB_TITLE FROM kmdb.KMDB_COLLECTIONS_REL
+	       
+	                        LEFT OUTER JOIN (SELECT PUB_ID, PUB_TITLE FROM kmdb.PUBLICATION, kmdb.KMDB_COLLECTIONS_REL) TA ON TO_CHAR(TA.PUB_ID)= kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+	               
+	                WHERE TYPE_CLSS = 'VO')
+	       
+	--중복값      
+	--          WHEN TYPE_CLSS  = 'ST' THEN
+	--                (SELECT
+	--                    STILL_NM FROM kmdb.KMDB_COLLECTIONS_REL
+	--                   
+	--                        LEFT OUTER JOIN (SELECT STILL_DETAIL_ID, STILL_NM FROM kmdb.STILL_DETAIL, KMDB.STILL ,kmdb.KMDB_COLLECTIONS_REL
+	--                        WHERE kmdb.STILL_DETAIL.STILL_ID=kmdb.STILL.STILL_ID) TA
+	--                        ON TO_CHAR(TA.STILL_DETAIL_ID) = kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+	--                WHERE TYPE_CLSS = 'ST')
+	                
+	             WHEN TYPE_CLSS  = 'SF' THEN 
+	 		 		  (SELECT DISTINCT
+					   STILFM_NM AS DATA_NM
+	         			FROM kmdb.KMDB_COLLECTIONS_REL
+	                   LEFT OUTER JOIN (SELECT STILLFILM_ID, STILFM_NM FROM kmdb.STILL_FILM, kmdb.KMDB_COLLECTIONS_REL) TA
+	               	 ON TO_CHAR(TA.STILLFILM_ID)= kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+	               	WHERE TYPE_CLSS = 'SF' )
+	               	
+	            WHEN TYPE_CLSS  = 'SC' THEN 
+	 				  (SELECT DISTINCT
+	         		   S_TITLE AS DATA_NM
+	         		   FROM kmdb.KMDB_COLLECTIONS_REL
+	                   LEFT OUTER JOIN (SELECT SCENARIO_ID, S_TITLE FROM kmdb.SCENARIO, kmdb.KMDB_COLLECTIONS_REL) TA
+	               	   ON TO_CHAR(TA.SCENARIO_ID)= kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+	               	   	WHERE TYPE_CLSS = 'SC') 
+	               	   	
+	           WHEN TYPE_CLSS  = 'RE' THEN 
+	 		        (SELECT DISTINCT
+	         		TITLE AS DATA_NM
+	         		FROM kmdb.KMDB_COLLECTIONS_REL
+	                LEFT OUTER JOIN (SELECT RECORD_ID, TITLE FROM kmdb.RECORD, kmdb.KMDB_COLLECTIONS_REL) TA
+	               	 ON TO_CHAR(TA.RECORD_ID)= kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+	               	 WHERE TYPE_CLSS ='RE')  
+	               	 
+	           WHEN TYPE_CLSS  = 'PO' THEN 
+	 		 		(SELECT DISTINCT
+	         		 POST_NAME AS DATA_NM
+	                 FROM kmdb.KMDB_COLLECTIONS_REL
+	                 LEFT OUTER JOIN (SELECT POSTER_ID, POST_NAME FROM kmdb.POSTER, kmdb.KMDB_COLLECTIONS_REL) TA
+	               	 ON TO_CHAR(TA.POSTER_ID)= kmdb.KMDB_COLLECTIONS_REL.DATA_ID     
+	               	 WHERE TYPE_CLSS ='PO')
+	               	 
+	           WHEN  TYPE_CLSS  = 'NE' THEN 
+	 				(SELECT DISTINCT
+	        		NEWS_NM AS DATA_NM
+	        		FROM kmdb.KMDB_COLLECTIONS_REL
+	                LEFT OUTER JOIN (SELECT NEWS_ID, NEWS_NM FROM kmdb.NEWS, kmdb.KMDB_COLLECTIONS_REL) TA
+	               	ON TO_CHAR(TA.NEWS_ID)= kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+	               	WHERE TYPE_CLSS  ='NE')
+	               	
+	            WHEN TYPE_CLSS  = 'MU' THEN 
+			 			(SELECT DISTINCT
+			     		MUL_TITLE AS DATA_NM
+			         	FROM kmdb.KMDB_COLLECTIONS_REL
+	                    LEFT OUTER JOIN (SELECT MUL_ID, MUL_TITLE FROM kmdb.MULTI_NEW, kmdb.KMDB_COLLECTIONS_REL) TA
+	               		ON TO_CHAR(TA.MUL_ID)= kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+	               		WHERE TYPE_CLSS ='MU')
+	               		
+	            WHEN TYPE_CLSS  = 'HA' THEN 
+							 (SELECT DISTINCT
+	      					  HANDBL_NM AS DATA_NM
+	        				  FROM kmdb.KMDB_COLLECTIONS_REL
+	                 		  LEFT OUTER JOIN (SELECT HANDBILL_DETAIL_ID, HANDBL_NM FROM kmdb.HANDBILL_DETAIL, KMDB.HANDBILL ,kmdb.KMDB_COLLECTIONS_REL
+	                  		  WHERE kmdb.HANDBILL_DETAIL.HANDBILL_DETAIL_ID=kmdb.HANDBILL.HANDBILL_ID) TA
+	                  		  ON TO_CHAR(TA.HANDBILL_DETAIL_ID) = kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+	                  		  WHERE TYPE_CLSS ='HA')
+	                  		  
+	            WHEN TYPE_CLSS  = 'CE' THEN 
+	 						  (SELECT DISTINCT
+	 						   TITLE AS DATA_NM
+	         				   FROM kmdb.KMDB_COLLECTIONS_REL
+	                 		   LEFT OUTER JOIN (SELECT CENSOR_DETAIL_ID, TITLE FROM kmdb.CENSORSHIP_DETAIL, KMDB.CENSORSHIP_ALL ,kmdb.KMDB_COLLECTIONS_REL
+	                  		   WHERE kmdb.CENSORSHIP_DETAIL.CENSOR_DETAIL_ID=kmdb.CENSORSHIP_ALL.CENSOR_ALL_ID) TA
+	                           ON TO_CHAR(TA.CENSOR_DETAIL_ID) = kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+	                           WHERE TYPE_CLSS ='CE')
+	                           
+	            WHEN TYPE_CLSS   = 'BO' THEN 
+	 						(SELECT DISTINCT
+	        			     BOOK_NM AS DATA_NM
+	         				 FROM kmdb.KMDB_COLLECTIONS_REL
+	                   		 LEFT OUTER JOIN (SELECT BOOK_DETAIL_ID, BOOK_NM , file_nm FROM kmdb.BOOK_DETAIL, KMDB.BOOK ,kmdb.KMDB_COLLECTIONS_REL
+	                  		 WHERE kmdb.BOOK_DETAIL.BOOK_DETAIL_ID=kmdb.BOOK.BOOK_ID) TA
+	                  		 ON TO_CHAR(TA.BOOK_DETAIL_ID) = kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+	                  		 WHERE TYPE_CLSS ='BO')
+	                  		 
+	            WHEN TYPE_CLSS   = 'AT' THEN 
+	 				     (SELECT DISTINCT
+						  C_TITLE AS DATA_NM
+	         			  FROM kmdb.KMDB_COLLECTIONS_REL
+	                   	  LEFT OUTER JOIN (SELECT ARTICLE_ID, C_TITLE FROM kmdb.ARTICLE, kmdb.KMDB_COLLECTIONS_REL ) TA
+	               	 	  ON TO_CHAR(TA.ARTICLE_ID)= kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+	               	 	  WHERE TYPE_CLSS ='AT')
+	               	 	  
+	               	                       
+	                          	 
+	            ELSE '' END AS DATA_NM
+	
+	    FROM kmdb.KMDB_COLLECTIONS_REL T2
+		 LEFT OUTER JOIN (SELECT ARCHIVES_SEQ, SUBJECT  FROM kmdb.TB_ONLINE_ARCHIVES ) T1 ON T1.ARCHIVES_SEQ  = T2.COL_ID 
+	     LEFT OUTER JOIN (SELECT COL_ID, COL_NAME FROM kmdb.KMDB_COLLECTIONS) TB ON TB.COL_ID = T2.COL_ID
+		 LEFT OUTER JOIN (SELECT CODE_NM ,CODE FROM kmdb.CODEINFO WHERE DIV_ID ='K05') TA ON TA.CODE = T2.TYPE_CLSS	
+		 WHERE 1 = 1
+		  <if test='colId != null and colId != ""'>
+				AND T2.COL_ID =  #{colId}
+			</if>
+			 <if test='sort1 != null and sort1 !=""'>
+            AND sort1 in
+             <foreach item="sort1" index="index" collection="sort1" open="(" separator="," close=")">
+            #{sort1}
+            </foreach>
+            </if>
+           
+            <if test='sort2 != null and sort2 !=""'>
+             OR sort2 in
+             <foreach item="sort2" index="index" collection="sort2" open="(" separator="," close=")">
+			#{sort2}
+			</foreach>
+			</if>
+			<if test='sort3 != null and sort3 !=""'>
+			OR sort3 in
+			 <foreach item="sort3" index="index" collection="sort3" open="(" separator="," close=")">
+			#{sort3}
+			</foreach>
+			</if>
+			<if test='sort4 != null and sort4 !=""'>
+			OR sort4 IN
+			 <foreach item="sort4" index="index" collection="sort4" open="(" separator="," close=")">
+			#{sort4}
+			</foreach>
+			</if>
+			<if test='sort5 != null and sort5 !=""'>
+			OR sort5 IN
+			 <foreach item="sort5" index="index" collection="sort5" open="(" separator="," close=")">
+			#{sort5}
+			</foreach>
+			</if>
+			   
+			)    	
+	
+	</select>
+	
+	
+	<select id="sortCheckBox" resultType="collectionList" parameterType="java.util.HashMap">
+	select REPLACE(REPLACE(SORT1, '[' ,''), ']', ',') AS sort1 
+	
+    from kmdb.kmdb_collections
+	Where col_id=#{colId}
+	
+	</select>
+	
+	<select id="sortCheckBox2" resultType="collectionList" parameterType="java.util.HashMap">
+		select REPLACE(REPLACE(SORT2, '[' ,''), ']', ',') AS sort2 
+		
+	    from kmdb.kmdb_collections
+		Where col_id=#{colId}
+	
+	</select>
+	
+	<select id="sortCheckBox3" resultType="collectionList" parameterType="java.util.HashMap">
+		select REPLACE(REPLACE(SORT3, '[' ,''), ']', ',') AS sort3 
+		
+	    from kmdb.kmdb_collections
+		Where col_id=#{colId}
+	
+	</select>
+	
+	<select id="sortCheckBox4" resultType="collectionList" parameterType="java.util.HashMap">
+		select REPLACE(REPLACE(SORT4, '[' ,''), ']', ',') AS sort4
+		
+	    from kmdb.kmdb_collections
+		Where col_id=#{colId}
+	
+	</select>
+	
+	<select id="sortCheckBox5" resultType="collectionList" parameterType="java.util.HashMap">
+		select REPLACE(REPLACE(SORT5, '[' ,''), ']', ',') AS sort5
+	 
+	    from kmdb.kmdb_collections
+		Where col_id=#{colId}
+	
+	</select>
+	
+	
+	
+	<select id="getPagingData" resultType="collectionList" parameterType="java.util.HashMap">
+	SELECT T2.* FROM (
+				SELECT ROWNUM ROWNO, T1.* 
+				FROM (SELECT DISTINCT
+	        DATA_ID AS dataId
+	    	,CODE_NM AS codeNm
+	    	,DATA_NO AS dataNo
+	    	,SUBJECT AS subject
+	    	,T2.COL_ID AS colId
+	    	,col_name AS cCollectionKofaGroupTitle
+	    	,CREATE_DATE AS createDate
+	    	,ADJUST_DATE AS adjustDate
+	    	,description AS description
+	    	,TYPE_CLSS AS typeClss
+	    	,sort1
+	    	,sort2
+	    	,sort3
+	    	,sort4
+	    	,sort5
+	        ,CASE WHEN TYPE_CLSS = 'TH' THEN
+	                (SELECT DISTINCT
+	                    THEORY_NM FROM kmdb.KMDB_COLLECTIONS_REL
+	                        LEFT OUTER JOIN (SELECT THEORY_DETAIL_ID, THEORY_NM FROM kmdb.THEORY_DETAIL, Kmdb.THEORY, kmdb.KMDB_COLLECTIONS_REL
+	                        WHERE kmdb.THEORY_DETAIL.THEORY_ID=kmdb.THEORY.THEORY_ID) TA
+	                        ON TO_CHAR(TA.THEORY_DETAIL_ID)= kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+	                       
+	                WHERE TYPE_CLSS = 'TH')
+	              
+	            WHEN TYPE_CLSS = 'VI' THEN
+	                (SELECT DISTINCT
+	                    TITLES FROM kmdb.KMDB_COLLECTIONS_REL
+	          
+	                        LEFT OUTER JOIN (SELECT VIDEO_DETAIL_ID, TITLES FROM kmdb.VIDEO_DETAIL, Kmdb.VIDEO, kmdb.KMDB_COLLECTIONS_REL WHERE kmdb.VIDEO_DETAIL.VIDEO_ID=kmdb.VIDEO.VIDEO_ID) TA ON TO_CHAR(TA.VIDEO_DETAIL_ID)= kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+	                WHERE TYPE_CLSS = 'VI')
+	              
+	            WHEN TYPE_CLSS = 'VO' THEN
+	                (SELECT DISTINCT
+	                    PUB_TITLE FROM kmdb.KMDB_COLLECTIONS_REL
+	       
+	                        LEFT OUTER JOIN (SELECT PUB_ID, PUB_TITLE FROM kmdb.PUBLICATION, kmdb.KMDB_COLLECTIONS_REL) TA ON TO_CHAR(TA.PUB_ID)= kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+	               
+	                WHERE TYPE_CLSS = 'VO')
+	       
+	--중복값      
+	--          WHEN TYPE_CLSS  = 'ST' THEN
+	--                (SELECT
+	--                    STILL_NM FROM kmdb.KMDB_COLLECTIONS_REL
+	--                   
+	--                        LEFT OUTER JOIN (SELECT STILL_DETAIL_ID, STILL_NM FROM kmdb.STILL_DETAIL, KMDB.STILL ,kmdb.KMDB_COLLECTIONS_REL
+	--                        WHERE kmdb.STILL_DETAIL.STILL_ID=kmdb.STILL.STILL_ID) TA
+	--                        ON TO_CHAR(TA.STILL_DETAIL_ID) = kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+	--                WHERE TYPE_CLSS = 'ST')
+	                
+	             WHEN TYPE_CLSS  = 'SF' THEN 
+	 		 		  (SELECT DISTINCT
+					   STILFM_NM AS DATA_NM
+	         			FROM kmdb.KMDB_COLLECTIONS_REL
+	                   LEFT OUTER JOIN (SELECT STILLFILM_ID, STILFM_NM FROM kmdb.STILL_FILM, kmdb.KMDB_COLLECTIONS_REL) TA
+	               	 ON TO_CHAR(TA.STILLFILM_ID)= kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+	               	WHERE TYPE_CLSS = 'SF' )
+	               	
+	            WHEN TYPE_CLSS  = 'SC' THEN 
+	 				  (SELECT DISTINCT
+	         		   S_TITLE AS DATA_NM
+	         		   FROM kmdb.KMDB_COLLECTIONS_REL
+	                   LEFT OUTER JOIN (SELECT SCENARIO_ID, S_TITLE FROM kmdb.SCENARIO, kmdb.KMDB_COLLECTIONS_REL) TA
+	               	   ON TO_CHAR(TA.SCENARIO_ID)= kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+	               	   	WHERE TYPE_CLSS = 'SC') 
+	               	   	
+	           WHEN TYPE_CLSS  = 'RE' THEN 
+	 		        (SELECT DISTINCT
+	         		TITLE AS DATA_NM
+	         		FROM kmdb.KMDB_COLLECTIONS_REL
+	                LEFT OUTER JOIN (SELECT RECORD_ID, TITLE FROM kmdb.RECORD, kmdb.KMDB_COLLECTIONS_REL) TA
+	               	 ON TO_CHAR(TA.RECORD_ID)= kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+	               	 WHERE TYPE_CLSS ='RE')  
+	               	 
+	           WHEN TYPE_CLSS  = 'PO' THEN 
+	 		 		(SELECT DISTINCT
+	         		 POST_NAME AS DATA_NM
+	                 FROM kmdb.KMDB_COLLECTIONS_REL
+	                 LEFT OUTER JOIN (SELECT POSTER_ID, POST_NAME FROM kmdb.POSTER, kmdb.KMDB_COLLECTIONS_REL) TA
+	               	 ON TO_CHAR(TA.POSTER_ID)= kmdb.KMDB_COLLECTIONS_REL.DATA_ID     
+	               	 WHERE TYPE_CLSS ='PO')
+	               	 
+	           WHEN  TYPE_CLSS  = 'NE' THEN 
+	 				(SELECT DISTINCT
+	        		NEWS_NM AS DATA_NM
+	        		FROM kmdb.KMDB_COLLECTIONS_REL
+	                LEFT OUTER JOIN (SELECT NEWS_ID, NEWS_NM FROM kmdb.NEWS, kmdb.KMDB_COLLECTIONS_REL) TA
+	               	ON TO_CHAR(TA.NEWS_ID)= kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+	               	WHERE TYPE_CLSS  ='NE')
+	               	
+	            WHEN TYPE_CLSS  = 'MU' THEN 
+			 			(SELECT DISTINCT
+			     		MUL_TITLE AS DATA_NM
+			         	FROM kmdb.KMDB_COLLECTIONS_REL
+	                    LEFT OUTER JOIN (SELECT MUL_ID, MUL_TITLE FROM kmdb.MULTI_NEW, kmdb.KMDB_COLLECTIONS_REL) TA
+	               		ON TO_CHAR(TA.MUL_ID)= kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+	               		WHERE TYPE_CLSS ='MU')
+	               		
+	            WHEN TYPE_CLSS  = 'HA' THEN 
+							 (SELECT DISTINCT
+	      					  HANDBL_NM AS DATA_NM
+	        				  FROM kmdb.KMDB_COLLECTIONS_REL
+	                 		  LEFT OUTER JOIN (SELECT HANDBILL_DETAIL_ID, HANDBL_NM FROM kmdb.HANDBILL_DETAIL, KMDB.HANDBILL ,kmdb.KMDB_COLLECTIONS_REL
+	                  		  WHERE kmdb.HANDBILL_DETAIL.HANDBILL_DETAIL_ID=kmdb.HANDBILL.HANDBILL_ID) TA
+	                  		  ON TO_CHAR(TA.HANDBILL_DETAIL_ID) = kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+	                  		  WHERE TYPE_CLSS ='HA')
+	                  		  
+	            WHEN TYPE_CLSS  = 'CE' THEN 
+	 						  (SELECT DISTINCT
+	 						   TITLE AS DATA_NM
+	         				   FROM kmdb.KMDB_COLLECTIONS_REL
+	                 		   LEFT OUTER JOIN (SELECT CENSOR_DETAIL_ID, TITLE FROM kmdb.CENSORSHIP_DETAIL, KMDB.CENSORSHIP_ALL ,kmdb.KMDB_COLLECTIONS_REL
+	                  		   WHERE kmdb.CENSORSHIP_DETAIL.CENSOR_DETAIL_ID=kmdb.CENSORSHIP_ALL.CENSOR_ALL_ID) TA
+	                           ON TO_CHAR(TA.CENSOR_DETAIL_ID) = kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+	                           WHERE TYPE_CLSS ='CE')
+	                           
+	            WHEN TYPE_CLSS   = 'BO' THEN 
+	 						(SELECT DISTINCT
+	        			     BOOK_NM AS DATA_NM
+	         				 FROM kmdb.KMDB_COLLECTIONS_REL
+	                   		 LEFT OUTER JOIN (SELECT BOOK_DETAIL_ID, BOOK_NM , file_nm FROM kmdb.BOOK_DETAIL, KMDB.BOOK ,kmdb.KMDB_COLLECTIONS_REL
+	                  		 WHERE kmdb.BOOK_DETAIL.BOOK_DETAIL_ID=kmdb.BOOK.BOOK_ID) TA
+	                  		 ON TO_CHAR(TA.BOOK_DETAIL_ID) = kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+	                  		 WHERE TYPE_CLSS ='BO')
+	                  		 
+	            WHEN TYPE_CLSS   = 'AT' THEN 
+	 				     (SELECT DISTINCT
+						  C_TITLE AS DATA_NM
+	         			  FROM kmdb.KMDB_COLLECTIONS_REL
+	                   	  LEFT OUTER JOIN (SELECT ARTICLE_ID, C_TITLE FROM kmdb.ARTICLE, kmdb.KMDB_COLLECTIONS_REL ) TA
+	               	 	  ON TO_CHAR(TA.ARTICLE_ID)= kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+	               	 	  WHERE TYPE_CLSS ='AT')
+	               	 	  
+	               	                       
+	                          	 
+	            ELSE '' END AS dataNm
+	
+	    FROM kmdb.KMDB_COLLECTIONS_REL T2
+		 LEFT OUTER JOIN (SELECT ARCHIVES_SEQ, SUBJECT  FROM kmdb.TB_ONLINE_ARCHIVES ) T1 ON T1.ARCHIVES_SEQ  = T2.COL_ID 
+	     LEFT OUTER JOIN (SELECT COL_ID, COL_NAME FROM kmdb.KMDB_COLLECTIONS) TB ON TB.COL_ID = T2.COL_ID
+		 LEFT OUTER JOIN (SELECT CODE_NM ,CODE FROM kmdb.CODEINFO WHERE DIV_ID ='K05') TA ON TA.CODE = T2.TYPE_CLSS	
+		 WHERE 1 = 1
+		 AND T2.COL_ID =  #{colId}
+		 <if test="codeNm != null and codeNm != ''">
+				AND CODE_NM  =  #{codeNm}
+		 </if>
+			<if test='sort1 != null and sort1 !=""'>
+				 AND T2.SORT1 = #{sort1}
+			
+			</if>
+			<if test='sort2 != null and sort2 !=""'>
+				 AND T2.SORT2 = #{sort2}
+			
+			</if>
+			<if test='sort3 != null and sort3 !=""'>
+				 AND T2.SORT3 = #{sort3}
+			
+			</if>
+			<if test='sort4 != null and sort4 !=""'>
+				 AND T2.SORT4 = #{sort4}
+			
+			</if>
+			<if test='sort5 != null and sort5 !=""'>
+				 AND T2.SORT5 = #{sort5}
+			
+			</if>
+		
+	
+		 ) T1
+		<if test='end != null and end !=""'>
+	          WHERE ROWNUM &lt;= #{end}
+	    </if>
+		) T2
+		<if test='start != null and start !=""'>
+		WHERE ROWNO &gt; = #{start}
+		</if>
+	
+	</select>
+	
+	<select id="getPagingDataAjax" resultType="collectionList" parameterType="map">
+	SELECT T2.* FROM (
+				SELECT ROWNUM ROWNO, T1.* 
+				FROM (SELECT DISTINCT
+	        DATA_ID AS dataId
+	    	,CODE_NM AS codeNm
+	    	,DATA_NO AS dataNo
+	    	,SUBJECT AS subject
+	    	,T2.COL_ID AS colId
+	    	,col_name AS cCollectionKofaGroupTitle
+	    	,CREATE_DATE AS createDate
+	    	,ADJUST_DATE AS adjustDate
+	    	,description AS description
+	    	,TYPE_CLSS AS typeClss
+	    	,sort1
+	    	,sort2
+	    	,sort3
+	    	,sort4
+	    	,sort5
+	        ,CASE WHEN TYPE_CLSS = 'TH' THEN
+	                (SELECT DISTINCT
+	                    THEORY_NM FROM kmdb.KMDB_COLLECTIONS_REL
+	                        LEFT OUTER JOIN (SELECT THEORY_DETAIL_ID, THEORY_NM FROM kmdb.THEORY_DETAIL, Kmdb.THEORY, kmdb.KMDB_COLLECTIONS_REL
+	                        WHERE kmdb.THEORY_DETAIL.THEORY_ID=kmdb.THEORY.THEORY_ID) TA
+	                        ON TO_CHAR(TA.THEORY_DETAIL_ID)= kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+	                       
+	                WHERE TYPE_CLSS = 'TH')
+	              
+	            WHEN TYPE_CLSS = 'VI' THEN
+	                (SELECT DISTINCT
+	                    TITLES FROM kmdb.KMDB_COLLECTIONS_REL
+	          
+	                        LEFT OUTER JOIN (SELECT VIDEO_DETAIL_ID, TITLES FROM kmdb.VIDEO_DETAIL, Kmdb.VIDEO, kmdb.KMDB_COLLECTIONS_REL WHERE kmdb.VIDEO_DETAIL.VIDEO_ID=kmdb.VIDEO.VIDEO_ID) TA ON TO_CHAR(TA.VIDEO_DETAIL_ID)= kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+	                WHERE TYPE_CLSS = 'VI')
+	              
+	            WHEN TYPE_CLSS = 'VO' THEN
+	                (SELECT DISTINCT
+	                    PUB_TITLE FROM kmdb.KMDB_COLLECTIONS_REL
+	       
+	                        LEFT OUTER JOIN (SELECT PUB_ID, PUB_TITLE FROM kmdb.PUBLICATION, kmdb.KMDB_COLLECTIONS_REL) TA ON TO_CHAR(TA.PUB_ID)= kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+	               
+	                WHERE TYPE_CLSS = 'VO')
+	       
+	--중복값      
+	--          WHEN TYPE_CLSS  = 'ST' THEN
+	--                (SELECT
+	--                    STILL_NM FROM kmdb.KMDB_COLLECTIONS_REL
+	--                   
+	--                        LEFT OUTER JOIN (SELECT STILL_DETAIL_ID, STILL_NM FROM kmdb.STILL_DETAIL, KMDB.STILL ,kmdb.KMDB_COLLECTIONS_REL
+	--                        WHERE kmdb.STILL_DETAIL.STILL_ID=kmdb.STILL.STILL_ID) TA
+	--                        ON TO_CHAR(TA.STILL_DETAIL_ID) = kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+	--                WHERE TYPE_CLSS = 'ST')
+	                
+	             WHEN TYPE_CLSS  = 'SF' THEN 
+	 		 		  (SELECT DISTINCT
+					   STILFM_NM AS DATA_NM
+	         			FROM kmdb.KMDB_COLLECTIONS_REL
+	                   LEFT OUTER JOIN (SELECT STILLFILM_ID, STILFM_NM FROM kmdb.STILL_FILM, kmdb.KMDB_COLLECTIONS_REL) TA
+	               	 ON TO_CHAR(TA.STILLFILM_ID)= kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+	               	WHERE TYPE_CLSS = 'SF' )
+	               	
+	            WHEN TYPE_CLSS  = 'SC' THEN 
+	 				  (SELECT DISTINCT
+	         		   S_TITLE AS DATA_NM
+	         		   FROM kmdb.KMDB_COLLECTIONS_REL
+	                   LEFT OUTER JOIN (SELECT SCENARIO_ID, S_TITLE FROM kmdb.SCENARIO, kmdb.KMDB_COLLECTIONS_REL) TA
+	               	   ON TO_CHAR(TA.SCENARIO_ID)= kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+	               	   	WHERE TYPE_CLSS = 'SC') 
+	               	   	
+	           WHEN TYPE_CLSS  = 'RE' THEN 
+	 		        (SELECT DISTINCT
+	         		TITLE AS DATA_NM
+	         		FROM kmdb.KMDB_COLLECTIONS_REL
+	                LEFT OUTER JOIN (SELECT RECORD_ID, TITLE FROM kmdb.RECORD, kmdb.KMDB_COLLECTIONS_REL) TA
+	               	 ON TO_CHAR(TA.RECORD_ID)= kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+	               	 WHERE TYPE_CLSS ='RE')  
+	               	 
+	           WHEN TYPE_CLSS  = 'PO' THEN 
+	 		 		(SELECT DISTINCT
+	         		 POST_NAME AS DATA_NM
+	                 FROM kmdb.KMDB_COLLECTIONS_REL
+	                 LEFT OUTER JOIN (SELECT POSTER_ID, POST_NAME FROM kmdb.POSTER, kmdb.KMDB_COLLECTIONS_REL) TA
+	               	 ON TO_CHAR(TA.POSTER_ID)= kmdb.KMDB_COLLECTIONS_REL.DATA_ID     
+	               	 WHERE TYPE_CLSS ='PO')
+	               	 
+	           WHEN  TYPE_CLSS  = 'NE' THEN 
+	 				(SELECT DISTINCT
+	        		NEWS_NM AS DATA_NM
+	        		FROM kmdb.KMDB_COLLECTIONS_REL
+	                LEFT OUTER JOIN (SELECT NEWS_ID, NEWS_NM FROM kmdb.NEWS, kmdb.KMDB_COLLECTIONS_REL) TA
+	               	ON TO_CHAR(TA.NEWS_ID)= kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+	               	WHERE TYPE_CLSS  ='NE')
+	               	
+	            WHEN TYPE_CLSS  = 'MU' THEN 
+			 			(SELECT DISTINCT
+			     		MUL_TITLE AS DATA_NM
+			         	FROM kmdb.KMDB_COLLECTIONS_REL
+	                    LEFT OUTER JOIN (SELECT MUL_ID, MUL_TITLE FROM kmdb.MULTI_NEW, kmdb.KMDB_COLLECTIONS_REL) TA
+	               		ON TO_CHAR(TA.MUL_ID)= kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+	               		WHERE TYPE_CLSS ='MU')
+	               		
+	            WHEN TYPE_CLSS  = 'HA' THEN 
+							 (SELECT DISTINCT
+	      					  HANDBL_NM AS DATA_NM
+	        				  FROM kmdb.KMDB_COLLECTIONS_REL
+	                 		  LEFT OUTER JOIN (SELECT HANDBILL_DETAIL_ID, HANDBL_NM FROM kmdb.HANDBILL_DETAIL, KMDB.HANDBILL ,kmdb.KMDB_COLLECTIONS_REL
+	                  		  WHERE kmdb.HANDBILL_DETAIL.HANDBILL_DETAIL_ID=kmdb.HANDBILL.HANDBILL_ID) TA
+	                  		  ON TO_CHAR(TA.HANDBILL_DETAIL_ID) = kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+	                  		  WHERE TYPE_CLSS ='HA')
+	                  		  
+	            WHEN TYPE_CLSS  = 'CE' THEN 
+	 						  (SELECT DISTINCT
+	 						   TITLE AS DATA_NM
+	         				   FROM kmdb.KMDB_COLLECTIONS_REL
+	                 		   LEFT OUTER JOIN (SELECT CENSOR_DETAIL_ID, TITLE FROM kmdb.CENSORSHIP_DETAIL, KMDB.CENSORSHIP_ALL ,kmdb.KMDB_COLLECTIONS_REL
+	                  		   WHERE kmdb.CENSORSHIP_DETAIL.CENSOR_DETAIL_ID=kmdb.CENSORSHIP_ALL.CENSOR_ALL_ID) TA
+	                           ON TO_CHAR(TA.CENSOR_DETAIL_ID) = kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+	                           WHERE TYPE_CLSS ='CE')
+	                           
+	            WHEN TYPE_CLSS   = 'BO' THEN 
+	 						(SELECT DISTINCT
+	        			     BOOK_NM AS DATA_NM
+	         				 FROM kmdb.KMDB_COLLECTIONS_REL
+	                   		 LEFT OUTER JOIN (SELECT BOOK_DETAIL_ID, BOOK_NM , file_nm FROM kmdb.BOOK_DETAIL, KMDB.BOOK ,kmdb.KMDB_COLLECTIONS_REL
+	                  		 WHERE kmdb.BOOK_DETAIL.BOOK_DETAIL_ID=kmdb.BOOK.BOOK_ID) TA
+	                  		 ON TO_CHAR(TA.BOOK_DETAIL_ID) = kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+	                  		 WHERE TYPE_CLSS ='BO')
+	                  		 
+	            WHEN TYPE_CLSS   = 'AT' THEN 
+	 				     (SELECT DISTINCT
+						  C_TITLE AS DATA_NM
+	         			  FROM kmdb.KMDB_COLLECTIONS_REL
+	                   	  LEFT OUTER JOIN (SELECT ARTICLE_ID, C_TITLE FROM kmdb.ARTICLE, kmdb.KMDB_COLLECTIONS_REL ) TA
+	               	 	  ON TO_CHAR(TA.ARTICLE_ID)= kmdb.KMDB_COLLECTIONS_REL.DATA_ID
+	               	 	  WHERE TYPE_CLSS ='AT')
+	               	 	  
+	               	                       
+	                          	 
+	            ELSE '' END AS dataNm
+	
+	    FROM kmdb.KMDB_COLLECTIONS_REL T2
+		 LEFT OUTER JOIN (SELECT ARCHIVES_SEQ, SUBJECT  FROM kmdb.TB_ONLINE_ARCHIVES ) T1 ON T1.ARCHIVES_SEQ  = T2.COL_ID 
+	     LEFT OUTER JOIN (SELECT COL_ID, COL_NAME FROM kmdb.KMDB_COLLECTIONS) TB ON TB.COL_ID = T2.COL_ID
+		 LEFT OUTER JOIN (SELECT CODE_NM ,CODE FROM kmdb.CODEINFO WHERE DIV_ID ='K05') TA ON TA.CODE = T2.TYPE_CLSS	
+		 WHERE 1 = 1
+		 	AND T2.COL_ID = #{colId}
+            <if test='sort1 != null and sort1 !=""'>
+            AND sort1 in
+             <foreach item="sort1" index="index" collection="sort1" open="(" separator="," close=")">
+            #{sort1}
+            </foreach>
+            </if>
+            <if test='sort2 != null and sort2 !=""'>
+            OR sort2 in
+             <foreach item="sort2" index="index" collection="sort2" open="(" separator="," close=")">
+			#{sort2}
+			</foreach>
+			</if>
+			<if test='sort3 != null and sort3 !=""'>
+			OR sort3 in
+			 <foreach item="sort3" index="index" collection="sort3" open="(" separator="," close=")">
+			#{sort3}
+			</foreach>
+			</if>
+			<if test='sort4 != null and sort4 !=""'>
+			OR sort4 IN
+			 <foreach item="sort4" index="index" collection="sort4" open="(" separator="," close=")">
+			#{sort4}
+			</foreach>
+			</if>
+			<if test='sort5 != null and sort5 !=""'>
+			OR sort5 IN
+			 <foreach item="sort5" index="index" collection="sort5" open="(" separator="," close=")">
+			#{sort5}
+			</foreach>
+			</if>
+			
+		 ) T1
+		<if test='end != null and end !=""'>
+	          WHERE ROWNUM &lt;= #{end}
+	    </if>
+		) T2
+		<if test='start != null and start !=""'>
+		WHERE ROWNO &gt; = #{start}
+		</if>
+	
+	</select>
+	
+	<select id="selectSorts" parameterType="java.util.HashMap" resultType="collectionList">
+          SELECT * 
+              FROM kmdb.KMDB_COLLECTIONS_REL A, kmdb.KMDB_COLLECTIONS B 
+               where 1 = 1
+              AND A.COL_ID = B.COL_ID 
+                <if test='colId != null and colId != ""'>
+				AND A.COL_ID =  #{colId} 
+			</if>
+            <if test='sort1 != null and sort1 !=""'>
+                 OR A.SORT1 = #{sort1}
+
+            </if>
+            <if test='sort2 != null and sort2 !=""'>
+                 OR A.SORT2 = #{sort2}
+
+            </if>
+            <if test='sort3 != null and sort3 !=""'>
+                 OR A.SORT3 = #{sort3}
+
+            </if>
+            <if test='sort4 != null and sort4 !=""'>
+                 OR A.SORT4 = #{sort4}
+
+            </if>
+            <if test='sort5 != null and sort5 !=""'>
+                 OR A.SORT5 = #{sort5}
+
+            </if>
+    </select>
+    
+    <select id="getCollectionDataInfoVI"  parameterType="java.util.HashMap" resultType="collectionList">
+
+	             SELECT 
+	       				TF.COL_ID AS colId,
+	       				TF.COL_NAME AS colName,
+	        			TA.CODE_NM AS codeNm,
+               			V2.TITLES AS dataNm,
+               			V2.TITLE_SUB AS dataNmSub,
+                		V2.TITLE_ETC AS dataNmEtc,
+                		V2.TITLE_EQUAL AS dataNmEq,
+                        TF.CODE_NM AS filmGyugek,
+                		V1.VIDEO_DETAIL_ID AS dataId ,
+		                V1.VIDEO_DETAIL_NO  AS dataNo ,
+		           		TC.CODE_NM AS colorClss ,
+		                TD.CODE_NM AS screenClss ,
+		             
+		                V2.RUNTIME AS runtime ,
+		                V2.LANG_CLSS AS langClss ,
+		                V2.CAP_CLSS AS capClss ,	            
+		                V2.CONTENTS  AS contents ,
+		                TE.CODE_NM AS keepCondition ,
+		                V1.LIB_DATE AS libDate,
+		                TB.ACQ_NAME AS acqNm,
+		                TB.ACQ_DATE AS acqDate,
+		                R1.DESCRIPTION AS description
+		           
+		                 
+                FROM 
+               KMDB.VIDEO_DETAIL V1 LEFT OUTER JOIN KMDB.VIDEO V2 ON V1.VIDEO_ID = V2.VIDEO_ID 
+               LEFT OUTER JOIN (SELECT COL_ID, DATA_ID, DATA_NO,TYPE_CLSS,DESCRIPTION FROM KMDB.KMDB_COLLECTIONS_REL ) R1 ON R1.DATA_ID = TO_CHAR(V1.VIDEO_DETAIL_ID) 
+               LEFT OUTER JOIN (SELECT CODE_NM ,CODE FROM KMDB.CODEINFO WHERE DIV_ID ='K05') TA ON TA.CODE = R1.TYPE_CLSS
+               LEFT OUTER JOIN (SELECT REP_ACQ_ID, ACQ_NAME, ACQ_DATE FROM KMDB.ACQ_WHERE)TB ON TB.REP_ACQ_ID = ACQ_ID
+               LEFT OUTER JOIN (SELECT COL_ID, COL_NAME FROM KMDB.KMDB_COLLECTIONS) TF ON TF.COL_ID = R1.COL_ID
+               LEFT OUTER JOIN (SELECT CODE_NM ,CODE FROM KMDB.CODEINFO WHERE DIV_ID ='B20') TC ON TC.CODE = V2.COLOR_CLSS
+               LEFT OUTER JOIN (SELECT CODE_NM ,CODE FROM KMDB.CODEINFO WHERE DIV_ID ='C05') TD ON TD.CODE = V2.SCREEN_CLSS
+               LEFT OUTER JOIN (SELECT CODE_NM ,CODE FROM KMDB.CODEINFO WHERE DIV_ID ='C10') TE ON TE.CODE = V1.KEEP_CONDITION
+               LEFT OUTER JOIN (SELECT CODE_NM ,CODE FROM KMDB.CODEINFO WHERE DIV_ID ='C04') TF ON TF.CODE = V2.DEV_CLSS
+
+               
+               WHERE R1.DATA_ID = #{dataId}
+                AND TF.col_name = #{colName}
+    
+	</select>
+	
+	<select id="getCollectionDataInfoTH"  parameterType="java.util.HashMap" resultType="collectionList">
+
+    		               
+   			                  
+                   SELECT
+                DISTINCT
+                TF.code_nm AS typeClss,
+                TA.col_name AS colName,
+                TA.CODE_NM AS codeNm,
+                 T1.THEORY_NM AS dataNm,
+                 T1.TITLE_SUB AS dataNmSub,
+                T1.TITLE_ETC AS dataNmEtc,
+                T1.TITLE_EQUAL AS dataNmEq,
+                 T1.THEORY_NO AS dataNo,
+                 T1.WRITER AS writer ,
+                 T1.PUB_PLACE AS publishPlace,
+                 T1.PUB_YEAR pubYear,
+                 TD.CODE_NM AS degreeClss,
+                 T1.LANG_CLSS AS langClss,
+                 TC.CODE_NM AS keepCondition,
+                  TB.ACQ_NAME AS acqNm,
+                TB.ACQ_DATE AS acqDate,
+                 T1.CREATE_DATE AS createdate,
+                 R1.DESCRIPTION AS description
+                
+                FROM
+               KMDB.THEORY T1 LEFT OUTER JOIN KMDB.THEORY_DETAIL T2 ON T1.THEORY_ID = T2.THEORY_ID
+               LEFT OUTER JOIN (SELECT DATA_ID, DATA_NO,TYPE_CLSS,col_id,DESCRIPTION FROM kmdb.KMDB_COLLECTIONS_REL ) R1 ON R1.DATA_ID = TO_CHAR(T2.THEORY_DETAIL_ID)             
+               LEFT OUTER JOIN (SELECT col_name , col_id FROM kmdb.KMDB_COLLECTIONS kc) TA ON TA.COL_ID = R1.COL_ID
+               LEFT OUTER JOIN (SELECT REP_ACQ_ID, ACQ_NAME, ACQ_DATE FROM kmdb.ACQ_WHERE)TB ON TB.REP_ACQ_ID = ACQ_ID
+              
+               LEFT OUTER JOIN (SELECT CODE_NM ,CODE FROM kmdb.CODEINFO WHERE DIV_ID ='D21') TC ON TC.CODE = T2.POS_CLSS
+               LEFT OUTER JOIN (SELECT CODE_NM ,CODE FROM kmdb.CODEINFO WHERE DIV_ID ='K05') TA ON TA.CODE = R1.TYPE_CLSS
+               LEFT OUTER JOIN (SELECT CODE_NM ,CODE FROM kmdb.CODEINFO WHERE DIV_ID ='D12') TD ON TD.CODE = T1.DEGREE_CLSS
+               LEFT OUTER JOIN (SELECT CODE_NM ,CODE FROM kmdb.CODEINFO WHERE DIV_ID ='E07') TF ON TF.CODE = T1.TYPE_CLSS
+                WHERE 1=1
+                
+
+             AND  R1.DATA_ID =  #{dataId}
+              AND TA.col_name = #{colName}
+    
+	</select>
+	
+	<select id="getCollectionDataInfoVO"  parameterType="java.util.HashMap" resultType="collectionList">
+  SELECT
+                   DISTINCT
+                   TQ.code_nm AS typeClss,
+                   TA.col_name AS colName,
+                 TA.CODE_NM AS codeNm,
+                  P.PUB_TITLE AS dataNm,
+                  P.TITLE_SUB AS dataNmSub,
+                  P.TITLE_ETC AS dataNmEtc,
+                  P.TITLE_EQUAL AS dataNmEq,
+                  P.ISDN AS isdn,
+	              P.PUB_NO AS dataNo,
+	              TQ.CODE AS kindClss,
+                  P.PUB_PLACE as pubPlace,
+                  P.LANG_CLSS as langClss,
+                  P.FIRST_YEAR as pubDate,
+                  R1.DESCRIPTION AS description
+                
+               FROM
+               KMDB.PUBLICATION P LEFT OUTER JOIN kmdb.KMDB_COLLECTIONS_REL R1 ON TO_CHAR(P.PUB_ID)  = R1.DATA_ID
+               LEFT OUTER JOIN (SELECT CODE_NM ,CODE FROM kmdb.CODEINFO WHERE DIV_ID ='K05') TA ON TA.CODE = R1.TYPE_CLSS       
+               LEFT OUTER JOIN (SELECT col_name , col_id FROM kmdb.KMDB_COLLECTIONS kc) TA ON TA.COL_ID = R1.COL_ID
+               LEFT OUTER JOIN (SELECT CODE_NM ,CODE  FROM kmdb.CODEINFO WHERE DIV_ID ='D39')TQ ON TQ.CODE = p.KIND_CLSS
+               WHERE 1=1
+          
+               AND R1.DATA_ID = #{dataId}
+                AND TA.col_name = #{colName}
+	</select>
+	
+	<select id="getCollectionDataInfoSF"  parameterType="java.util.HashMap" resultType="collectionList">
+            SELECT
+                DISTINCT
+                TV.code_nm AS typeClss,
+                TA.col_name AS colName,
+                  TA.CODE_NM AS codeNm,
+                  S.STILFM_NM AS dataNm,
+                  S.STILLFILM_NO AS dataNo,
+                TC.CODE_NM AS gubun,
+                TD.PROD_YEAR_EST_YN AS prodYearYn,
+                TD.COMPY_CLSS AS producer,
+                TD.DIRECTOR AS director,
+                TD.PROD_YEAR AS createDate,
+                S.KEYWORDS AS contents,
+                  S.PERSON_INFO AS people,
+                  TD.CODE_NM AS keepCondition,
+                  S.REC_SITE AS acqNm,
+                S.REC_DATE AS acqDate,
+                  R1.DESCRIPTION AS description
+                
+                FROM
+               KMDB.STILL_FILM S LEFT OUTER JOIN kmdb.KMDB_COLLECTIONS_REL R1 ON TO_CHAR(S.STILLFILM_ID)  = R1.DATA_ID
+               LEFT OUTER JOIN(SELECT MOVIE_ID, MOVIE_SEQ, TITLE, COMPY_CLSS, DIRECTOR, PROD_YEAR_EST_YN,PROD_YEAR FROM kmdb.MOVIE_SE) TD ON TD.MOVIE_ID = S.MOVIE_ID AND TD.MOVIE_SEQ = S.MOVIE_SEQ
+               LEFT OUTER JOIN (SELECT CODE_NM ,CODE FROM kmdb.CODEINFO WHERE DIV_ID ='K05') TA ON TA.CODE = R1.TYPE_CLSS   
+               LEFT OUTER JOIN (SELECT col_name , col_id FROM kmdb.KMDB_COLLECTIONS kc) TA ON TA.COL_ID = R1.COL_ID
+               LEFT OUTER JOIN (SELECT REP_ACQ_ID, ACQ_NAME, ACQ_DATE FROM kmdb.ACQ_WHERE)TB ON TB.REP_ACQ_ID = ACQ_ID
+              
+               LEFT OUTER JOIN (SELECT CODE_NM ,CODE FROM kmdb.CODEINFO WHERE DIV_ID ='E01') TC ON TC.CODE = S.TYPE_CLSS
+               LEFT OUTER JOIN (SELECT CODE_NM ,CODE FROM kmdb.CODEINFO WHERE DIV_ID ='D21') TD ON TD.CODE = S.POS_CLSS
+               LEFT OUTER JOIN (SELECT CODE_NM ,CODE FROM kmdb.CODEINFO WHERE DIV_ID ='E11') TV ON TV.code = S.TYPE_CLSS
+               where 1 =1 
+               
+       
+      
+               
+             
+               AND R1.DATA_ID = #{dataId}	
+               AND TA.col_name = #{colName}
+	</select>
+	
+	<select id="getCollectionDataInfoST"  parameterType="java.util.HashMap" resultType="collectionList">
+                 SELECT 
+                    DISTINCT
+                    TA.col_name AS colName,
+                   TA.CODE_NM AS codeNm,
+              S2.STILL_NM AS dataNm,
+              TC.CODE_NM AS typeClss,
+              S1.STILL_DETAIL_NO AS dataNo,
+              TD.COMPY_CLSS AS producer,
+	          TD.DIRECTOR AS director,
+	          TD.PROD_YEAR_EST_YN AS prodYearYn,
+              TD.PROD_YEAR AS createDate,
+              S2.KEYWORDS AS contents,
+              S2.PERSON_INFO AS people,             
+              C3.CODE_NM AS keepCondition,
+              C4.CODE_NM AS acqMethod,
+              S1.REC_SITE AS acqNm ,     
+              S1.REC_DATE AS acqDate ,   
+              R1.DESCRIPTION AS description
+                FROM 
+               KMDB.STILL_DETAIL S1 LEFT OUTER JOIN KMDB.STILL S2 ON S1.STILL_DETAIL_ID = S2.STILL_ID 
+               LEFT OUTER JOIN (SELECT DATA_ID, DATA_NO,TYPE_CLSS,col_id,DESCRIPTION FROM kmdb.KMDB_COLLECTIONS_REL ) R1  ON  TO_CHAR(S1.STILL_DETAIL_ID) = R1.DATA_ID 
+               LEFT OUTER JOIN(SELECT MOVIE_ID, MOVIE_SEQ, TITLE, COMPY_CLSS, DIRECTOR, PROD_YEAR,PROD_YEAR_EST_YN FROM kmdb.MOVIE_SE) TD ON TD.MOVIE_ID = S2.MOVIE_ID AND TD.MOVIE_SEQ = S2.MOVIE_SEQ
+               LEFT OUTER JOIN (SELECT CODE_NM ,CODE FROM kmdb.CODEINFO WHERE DIV_ID ='K05') TA ON TA.CODE = R1.TYPE_CLSS
+               LEFT OUTER JOIN (SELECT col_name , col_id FROM kmdb.KMDB_COLLECTIONS kc) TA ON TA.COL_ID = R1.COL_ID
+               LEFT OUTER JOIN (SELECT REP_ACQ_ID, ACQ_NAME, ACQ_DATE FROM kmdb.ACQ_WHERE)TB ON TB.REP_ACQ_ID = ACQ_ID
+               LEFT OUTER JOIN (SELECT CODE_NM ,CODE FROM kmdb.CODEINFO WHERE DIV_ID ='E03') TC ON TC.CODE = S2.TYPE_CLSS
+               LEFT OUTER JOIN (SELECT CODE_NM  , code , div_id FROM kmdb.CODEINFO WHERE DIV_ID ='D21' ) C3 ON C3.CODE = S1.POS_CLSS
+               LEFT OUTER JOIN (SELECT CODE_NM  , code , div_id FROM kmdb.CODEINFO WHERE DIV_ID ='D04' ) C4 ON C4.CODE = S1.METHOD_CLSS
+               WHERE 1=1
+               
+      
+               
+             AND  R1.DATA_ID =  #{dataId}	
+             AND TA.col_name = #{colName}
+	</select>
+	
+	<select id="getCollectionDataInfoSC"  parameterType="java.util.HashMap" resultType="collectionList">
+            SELECT 
+             
+                     DISTINCT
+                   TA.col_name AS colName,
+                   TA.CODE_NM AS codeNm,
+                   S1.S_TITLE AS dataNm,
+                   S1.TITLE_ETC AS dataNmEtc,
+                   S1.TITLE_SUB AS dataNmSub,
+                   S1.TITLE_EQUAL AS dataNmEq,
+                   C5.CODE_NM AS formClss,
+                   S1.SCENARIO_NO AS dataNo,
+                   TB.COMPY_CLSS AS producer,
+                    TB.DIRECTOR AS director,
+                   TB.PROD_YEAR AS createDate,
+                   S1.LANG_CLSS AS langClss,
+                   c3.code_nm AS keepCondition,
+                   c4.code_nm AS acqMethod,
+                   S2.REC_SITE AS acqNm,
+                   S2.REC_DATE AS acqDate,
+                   TB.PROD_YEAR_EST_YN AS prodYearYn,
+                   R1.DESCRIPTION AS description
+             	
+             	
+                FROM 
+               KMDB.SCENARIO S1 LEFT OUTER JOIN KMDB.SCENARIO_DETAIL S2 ON S1.SCENARIO_ID = S2.SCENARIO_DETAIL_ID
+               LEFT OUTER JOIN (SELECT DATA_ID, DATA_NO,TYPE_CLSS ,col_id,DESCRIPTION FROM kmdb.KMDB_COLLECTIONS_REL ) R1 ON R1.DATA_ID = TO_CHAR(S2.SCENARIO_DETAIL_ID) 
+               LEFT OUTER JOIN (SELECT CODE_NM ,CODE FROM kmdb.CODEINFO WHERE DIV_ID ='K05') TA ON TA.CODE = R1.TYPE_CLSS
+               LEFT OUTER JOIN (SELECT col_name , col_id FROM kmdb.KMDB_COLLECTIONS kc) TA ON TA.COL_ID = R1.COL_ID
+               LEFT OUTER JOIN (SELECT REP_ACQ_ID, ACQ_NAME, ACQ_DATE FROM kmdb.ACQ_WHERE)TB ON TB.REP_ACQ_ID = ACQ_ID
+               LEFT OUTER JOIN(SELECT MOVIE_ID, MOVIE_SEQ, TITLE, COMPY_CLSS, DIRECTOR, PROD_YEAR_EST_YN,PROD_YEAR FROM kmdb.MOVIE_SE) TB ON TB.MOVIE_ID = S1.MOVIE_id AND TB.MOVIE_SEQ = S1.MOVIE_SEQ
+               LEFT OUTER JOIN (SELECT CODE_NM  , code , div_id FROM kmdb.CODEINFO WHERE DIV_ID ='D21' ) C3 ON C3.CODE = S2.POS_CLSS
+               LEFT OUTER JOIN (SELECT CODE_NM  , code , div_id FROM kmdb.CODEINFO WHERE DIV_ID ='D04' ) C4 ON C4.CODE = S2.METHOD_CLSS
+               LEFT OUTER JOIN (SELECT CODE_NM  , code , div_id FROM kmdb.CODEINFO WHERE DIV_ID ='E07' ) C5 ON C5.CODE = S1.FORM_CLSS
+               WHERE 1=1
+               
+      
+               
+               AND  R1.DATA_ID =  #{dataId}	
+               AND TA.col_name = #{colName}
+	</select>
+	
+	<select id="getCollectionDataInfoRE"  parameterType="java.util.HashMap" resultType="collectionList">
+            SELECT 
+                   distinct
+                TA.col_name AS col_name,
+                TA.CODE_NM AS codeNm,
+
+             	R1.TITLE AS dataNm,
+             	R1.RECORD_NO AS dataNum,
+             	R1.TITLE_SUB AS dataNmSub,
+             	R1.TITLE_ETC AS dataNmEtc,
+             	R1.TITLE_EQUAL AS dataNmEq,
+                C7.CODE_NM AS degreeClss,
+             	R1.PROD_YEAR AS createYear,
+             	R1.LABLE AS lable,
+             	R1.OUTER AS publisher,
+             	R1.IMPORT AS importPlace,                
+             	R1.NOTE AS contents,
+                R3.POS_CLSS AS keepCondition,
+             	R3.ACQUIRE_PLACE AS acqName,
+                R3.ACQUIRE_CLSS AS acqMehtod,
+             	C6.CODE_NM AS typeClss,
+             	R3.ACQUIRE_DATE AS acqDate,
+             	R2.DESCRIPTION AS description
+             	
+             	
+                FROM 
+               KMDB.RECORD R1 LEFT OUTER JOIN KMDB.KMDB_COLLECTIONS_REL R2 ON TO_CHAR(R1.RECORD_ID) = R2.DATA_ID 
+               LEFT OUTER JOIN (SELECT CODE_NM ,CODE FROM kmdb.CODEINFO WHERE DIV_ID ='K05') TA ON TA.CODE = R2.TYPE_CLSS       
+               LEFT OUTER JOIN (SELECT col_name , col_id FROM kmdb.KMDB_COLLECTIONS kc) TA ON TA.COL_ID = R2.COL_ID
+               LEFT OUTER JOIN (SELECT * FROM KMDB.RECORD_IN )R3 ON R1.RECORD_ID = R3.RECORD_ID
+               LEFT OUTER JOIN (SELECT div_id , code , CODE_NM FROM kmdb.CODEINFO WHERE DIV_ID='F09') C6 ON c6.code = R1.RECORD_CLSS
+               LEFT OUTER JOIN (SELECT div_id , code , CODE_NM FROM kmdb.CODEINFO WHERE DIV_ID='F10') C7 ON c7.code = R1.DEV_CLSS
+               WHERE 1=1
+               
+             AND  R2.DATA_ID = #{dataId}	
+             AND TA.col_name = #{colName}
+	</select>
+	
+	<select id="getCollectionDataInfoPO"  parameterType="java.util.HashMap" resultType="collectionList">
+   SELECT
+                      DISTINCT
+                      TA.CODE_NM AS codeNm,
+         			  TA.col_name AS colName,
+                      TQ.code_nm AS typeClss,
+                       P1.POSTER_ID AS dataId,
+                       P1.POST_NAME AS dataNm,
+                       P1.TITLE_SUB AS dataNmSub,
+                       P1.TITLE_ETC AS dataNmEtc,
+                       P1.TITLE_EQUAL AS dataNmEq,
+                       P1.POSTER_NO AS dataNo,
+                       TA.COMPY_CLSS AS producer,
+                       TA.DIRECTOR AS director,
+                       TA.PROD_YEAR AS createDate,
+                       TC.CODE_NM AS keepCondition,
+                          TB.ACQ_NAME AS acqNm,
+                       TB.ACQ_DATE AS acqDate,
+                       TA.PROD_YEAR_EST_YN AS prodYearYn,
+                       R1.description AS description
+                   
+               FROM KMDB.POSTER P1
+               LEFT OUTER JOIN KMDB.KMDB_COLLECTIONS_REL R1 ON TO_CHAR(P1.POSTER_ID) = R1.DATA_ID
+               LEFT OUTER JOIN(SELECT MOVIE_ID, MOVIE_SEQ, TITLE, COMPY_CLSS, DIRECTOR, PROD_YEAR,PROD_YEAR_EST_YN FROM kmdb.MOVIE_SE) TA ON TA.MOVIE_ID = P1.MOVIE_ID AND TA.MOVIE_SEQ = P1.MOVIE_SEQ
+               LEFT OUTER JOIN (SELECT col_name , col_id FROM kmdb.KMDB_COLLECTIONS kc) TA ON TA.COL_ID = R1.COL_ID
+               LEFT OUTER JOIN (SELECT ACQ_ID,POS_CLSS FROM KMDB.POSTER_SET )P2 ON P1.POSTER_ID = P2.ACQ_ID
+               LEFT OUTER JOIN (SELECT REP_ACQ_ID, ACQ_NAME, ACQ_DATE FROM kmdb.ACQ_WHERE)TB ON TB.REP_ACQ_ID = ACQ_ID
+              
+               LEFT OUTER JOIN (SELECT CODE_NM ,CODE FROM kmdb.CODEINFO WHERE DIV_ID ='K05') TA ON TA.CODE = R1.TYPE_CLSS
+               LEFT OUTER JOIN (SELECT CODE_NM ,CODE FROM kmdb.CODEINFO WHERE DIV_ID ='D21') TC ON TC.CODE = P2.POS_CLSS    
+               LEFT OUTER JOIN (SELECT CODE_NM ,CODE FROM kmdb.CODEINFO WHERE DIV_ID ='E07') TQ ON TQ.code = P1.TYPE_CLSS
+               WHERE 1=1
+
+             AND  R1.DATA_ID = #{dataId}	
+             AND TA.col_name = #{colName}
+	</select>
+	
+	<select id="getCollectionDataInfoNE"  parameterType="java.util.HashMap" resultType="collectionList">
+              SELECT 
+                       DISTINCT
+                       		TA.CODE_NM AS colName,
+                 TA.CODE_NM AS codeNm,
+	             N1.NEWS_NM AS dataNm,
+	             N1.NEWS_NO AS dataNo,
+                 TA.COMPY_CLSS AS producer,
+	             TA.DIRECTOR AS director,
+                 TA.PROD_YEAR AS createDate,
+	             N1.CREATE_DATE AS createYear,
+	             N1.TITLE_EQUAL AS dataNmEq,
+	             N1.TITLE_SUB AS dataNmSub,
+	             N1.TITLE_ETC AS dataNmEtc,
+                 C2.CODE_NM AS kindClss,
+	             N1.LANG_CLSS AS langClss,
+	             N1.PUB_PLACE AS publisher,
+                 N1.MARKETING AS marketing,
+                 N1.IMPORT_PLACE AS importPlace,
+	             N1.PUB_DATE AS pubDate,
+                 C3.CODE_NM AS keepCondition,
+	             N2.REC_SITE AS acqNm,
+                 C4.CODE_NM AS acqMethod,
+                 N2.REC_DATE AS acqDate,
+                 C1.CODE_NM AS typeClss,
+                 TA.PROD_YEAR_EST_YN AS prodYearYn,
+	             r1.description AS description 
+                FROM 
+               KMDB.NEWS N1 LEFT OUTER JOIN KMDB.NEWS_DETAIL N2 ON N1.NEWS_ID = N2.NEWS_DETAIL_ID 
+               LEFT OUTER JOIN(SELECT MOVIE_ID, MOVIE_SEQ, TITLE,PROD_YEAR_EST_YN, COMPY_CLSS, DIRECTOR, PROD_YEAR FROM kmdb.MOVIE_SE) TA ON TA.MOVIE_ID = N1.MOVIE_ID AND TA.MOVIE_SEQ = N1.MOVIE_SEQ
+               LEFT OUTER JOIN (SELECT DATA_ID,col_id, DATA_NO,TYPE_CLSS,DESCRIPTION FROM kmdb.KMDB_COLLECTIONS_REL ) R1  ON  TO_CHAR(N2.NEWS_DETAIL_ID) = R1.DATA_ID 
+               LEFT OUTER JOIN (SELECT CODE_NM ,CODE FROM kmdb.CODEINFO WHERE DIV_ID ='K05') TA ON TA.CODE = R1.TYPE_CLSS
+               LEFT OUTER JOIN (SELECT REP_ACQ_ID, ACQ_NAME, ACQ_DATE FROM kmdb.ACQ_WHERE)TB ON TB.REP_ACQ_ID = ACQ_ID
+                LEFT OUTER JOIN (SELECT col_name , col_id FROM kmdb.KMDB_COLLECTIONS kc) TA ON TA.COL_ID = R1.COL_ID
+               LEFT OUTER JOIN ( SELECT ADDRESS , ACQ_WHERE_ID FROM kmdb.ACQ_WHERE)A5 ON A5.ACQ_WHERE_ID = ACQ_ID
+               LEFT OUTER JOIN (SELECT CODE_NM  , code , div_id FROM kmdb.CODEINFO WHERE DIV_ID ='E07' ) C1 ON C1.CODE = N1.CONTENS_CLSS
+               LEFT OUTER JOIN (SELECT CODE_NM  , code , div_id FROM kmdb.CODEINFO WHERE DIV_ID ='E07' ) C2 ON C2.CODE = N1.KIND_CLSS
+               LEFT OUTER JOIN (SELECT CODE_NM  , code , div_id FROM kmdb.CODEINFO WHERE DIV_ID ='D21' ) C3 ON C3.CODE = N2.POS_CLSS
+               LEFT OUTER JOIN (SELECT CODE_NM  , code , div_id FROM kmdb.CODEINFO WHERE DIV_ID ='D04' ) C4 ON C4.CODE = N2.METHOD_CLSS
+               WHERE 1=1
+      
+               
+               
+               
+             AND  R1.DATA_ID = #{dataId}
+             AND TA.col_name = #{colName}
+	</select>
+	
+	<select id="getCollectionDataInfoMU"  parameterType="java.util.HashMap" resultType="collectionList">
+        SELECT
+                distinct
+               		 TA.col_name AS colName,
+                    M1.MUL_ID,
+                  --  TQ.CODE_NM AS acqMethod,
+                    M1.MUL_NO AS dataId,
+                    M1.MUL_TITLE AS dataNm,
+                    M1.TITLE_SUB AS dataNmSub,
+                    M1.TITLE_ETC AS dataNmEtc,
+                    M1.TITLE_EQUAL AS dataNmEq,
+                    M1.MUL_NO AS dataNo,
+                    TD.CODE_NM AS mscreenClss,
+                    TC.CODE_NM AS colorClss,
+                    M1.RUNTIME AS runtime,
+                    M1.LANGUAGE AS language,
+                    M1.PLOT AS contents,
+                   --MF.REC_SITE AS acqNm,
+                   --MF.REC_DATE AS acqDate,
+                    M1.MUL_PRODUCER AS producer ,
+                    M1.MUL_YEAR AS year,
+                    R1.DESCRIPTION AS description
+                FROM
+               KMDB.MULTI_NEW M1
+               LEFT OUTER JOIN KMDB.KMDB_COLLECTIONS_REL R1 ON TO_CHAR(M1.MUL_ID) = R1.DATA_ID
+               LEFT OUTER JOIN (SELECT col_name , col_id  FROM kmdb.KMDB_COLLECTIONS kc) TA ON TA.col_id = R1.COL_ID
+               LEFT OUTER JOIN  (SELECT  MUL_ID, REC_SITE,METHOD_CLSS, REC_DATE FROM kmdb.MULTI_FILE) MF ON MF.MUL_ID = M1.MUL_ID
+              
+               LEFT OUTER JOIN (SELECT CODE_NM ,CODE FROM kmdb.CODEINFO WHERE DIV_ID ='K05') TB ON TB.CODE = R1.TYPE_CLSS
+               LEFT OUTER JOIN (SELECT CODE_NM ,CODE FROM kmdb.CODEINFO WHERE DIV_ID ='B20') TC ON TC.CODE = M1.COLOR_CLSS
+               LEFT OUTER JOIN (SELECT CODE_NM ,CODE FROM kmdb.CODEINFO WHERE DIV_ID ='A09') TD ON TD.CODE = M1.MSCREEN_CLSS
+             --  LEFT OUTER JOIN (SELECT CODE_NM ,CODE FROM kmdb.CODEINFO WHERE DIV_ID ='C03') TQ ON TQ.code = MF.METHOD_CLSS
+               WHERE 1=1
+               
+             AND  R1.DATA_ID =  #{dataId}
+             AND TA.col_name = #{colName}	
+	</select>
+	
+	<select id="getCollectionDataInfoHA"  parameterType="java.util.HashMap" resultType="collectionList">
+        SELECT 
+             DISTINCT
+               	TA.col_name AS colName,
+                	TA.CODE_NM AS codeNm,           
+	             H1.HANDBL_NM AS dataNm,
+                 H1.title_etc AS dataNmEtc,
+	             H1.TITLE_SUB AS dataNmSub,
+	             H1.TITLE_EQUAL AS dataNmEq,
+                 C6.CODE_NM AS  kindClss,
+	             H1.HANDBILL_NO AS dataNo,
+                 TA.COMPY_CLSS AS producer,
+	             TA.DIRECTOR AS director,
+	             TA.PROD_YEAR AS createDate,
+                 H1.PUB_PLACE AS publisher,
+                 H1.IMPORT_PLACE AS importPlace,
+                 H1.PUB_DATE AS pubDate,               
+                C3.CODE_NM AS keepCondition,
+                C4.CODE_NM AS acqMethod,
+                H2.REC_SITE AS acqNm ,     
+                H2.REC_DATE AS acqDate ,  
+                TA.PROD_YEAR_EST_YN AS prodYearYn,
+	             R1.DESCRIPTION AS description
+	             
+               FROM 
+               KMDB.HANDBILL H1 LEFT OUTER JOIN KMDB.HANDBILL_DETAIL H2 ON H1.HANDBILL_ID = H2.HANDBILL_DETAIL_ID 
+               LEFT OUTER JOIN (SELECT DATA_ID, DATA_NO,col_id,TYPE_CLSS,DESCRIPTION FROM kmdb.KMDB_COLLECTIONS_REL ) R1  ON  TO_CHAR(H2.HANDBILL_DETAIL_ID) = R1.DATA_ID 
+               LEFT OUTER JOIN (SELECT CODE_NM ,CODE FROM kmdb.CODEINFO WHERE DIV_ID ='K05') TA ON TA.CODE = R1.TYPE_CLSS
+               LEFT OUTER JOIN (SELECT col_name , col_id FROM kmdb.KMDB_COLLECTIONS kc) TA ON TA.COL_ID = R1.COL_ID
+               LEFT OUTER JOIN (SELECT CODE_NM  , code , div_id FROM kmdb.CODEINFO WHERE DIV_ID ='D21' ) C3 ON C3.CODE = H2.POS_CLSS
+               LEFT OUTER JOIN (SELECT CODE_NM  , code , div_id FROM kmdb.CODEINFO WHERE DIV_ID ='D04' ) C4 ON C4.CODE = H2.METHOD_CLSS
+               
+               LEFT OUTER JOIN (SELECT REP_ACQ_ID, ACQ_NAME, ACQ_DATE FROM kmdb.ACQ_WHERE)TB ON TB.REP_ACQ_ID = ACQ_ID
+               LEFT OUTER JOIN(SELECT MOVIE_ID, MOVIE_SEQ, TITLE, COMPY_CLSS, DIRECTOR, PROD_YEAR_EST_YN,PROD_YEAR FROM kmdb.MOVIE_SE) TA ON TA.MOVIE_ID = to_char(H2.HANDBILL_DETAIL_ID) AND TA.MOVIE_SEQ = H1.MOVIE_SEQ
+                LEFT OUTER JOIN ( SELECT ADDRESS , ACQ_WHERE_ID FROM kmdb.ACQ_WHERE)A5 ON A5.ACQ_WHERE_ID = ACQ_ID
+               LEFT OUTER JOIN (SELECT CODE_NM  , code , div_id FROM kmdb.CODEINFO WHERE DIV_ID ='D04' ) C4 ON C4.CODE = H2.METHOD_CLSS
+               LEFT OUTER JOIN (SELECT CODE_NM  , code , div_id FROM kmdb.CODEINFO WHERE DIV_ID ='E07' ) c6 ON c6.code = H1.kind_clss
+               LEFT OUTER JOIN (SELECT CODE_NM  , code , div_id FROM kmdb.CODEINFO WHERE DIV_ID ='D21' ) c7 ON c7.code = H2.POS_CLSS
+               WHERE 1=1
+      
+                
+             AND  R1.DATA_ID  =  #{dataId}	
+             AND TA.col_name = #{colName}
+	</select>
+	<select id="getCollectionDataInfoET" parameterType="java.util.HashMap" resultType="collectionList">
+	SELECT 
+                    DISTINCT
+                    KC.COL_NAME,
+                    KC.COL_ID,
+                     A.ETC_NO AS dataNo,
+                     A.TITLE AS dataNm,
+                     A.TITLE_SUB AS dataNmSub,
+                     A.TITLE_ETC AS dataNmEtc,
+                    A.TITLE_EQUAL AS dataNmEq,
+                    TB.CODE_NM AS typeClss,
+                    TC.CODE_NM AS kindClss,
+                    TD.CODE_NM AS producer,
+                    TA.DIRECTOR AS director,
+                    TA.PROD_YEAR AS createYear,
+                    TA.PROD_YEAR_EST_YN AS estYn,
+                    A.LANG_CLSS AS langClss,
+                    A.PUB_PLACE AS poubPlace,
+                    A.PUB_DATE AS pubDate,
+                    A.PRODUCER AS creator,
+                    A.REL_PERSON AS relPerseon,
+                    A.E_PAGE AS page,
+                    TE.CODE_NM AS keepCondition,
+                    TF.CODE_NM AS acqMethod,
+                    B.REC_SITE AS acqNm,
+                    B.REC_DATE AS acqDate,
+                    RL.DESCRIPTION AS description
+ 
+                FROM 
+                KMDB.ETC_PR A 
+                LEFT OUTER JOIN KMDB.KMDB_COLLECTIONS_REL RL ON TO_CHAR(A.ETC_ID)  = RL.DATA_ID
+                LEFT OUTER JOIN KMDB.ETC_PR_DETAIL B ON B.ETC_DETAIL_NO = A.ETC_NO
+                LEFT OUTER JOIN(SELECT MOVIE_ID, MOVIE_SEQ, COMPY_CLSS, DIRECTOR, PROD_YEAR, PROD_YEAR_EST_YN  FROM kmdb.MOVIE_SE) TA ON TA.MOVIE_ID = A.MOVIE_ID AND TA.MOVIE_SEQ = A.MOVIE_SEQ
+                LEFT OUTER JOIN (SELECT COL_NAME , COL_ID FROM KMDB.KMDB_COLLECTIONS ) KC ON KC.COL_ID = RL.COL_ID
+
+                LEFT OUTER JOIN (SELECT CODE_NM ,CODE FROM KMDB.CODEINFO WHERE DIV_ID ='D23') TB ON TB.CODE = A.DIV_CLSS
+                LEFT OUTER JOIN (SELECT CODE_NM ,CODE FROM KMDB.CODEINFO WHERE DIV_ID ='E07') TC ON TC.CODE = A.KIND_CLSS                
+                LEFT OUTER JOIN (SELECT CODE_NM ,CODE FROM KMDB.CODEINFO WHERE DIV_ID ='A11') TD ON TD.CODE = TA.COMPY_CLSS
+                LEFT OUTER JOIN (SELECT CODE_NM ,CODE FROM KMDB.CODEINFO WHERE DIV_ID ='D21') TE ON TE.CODE = B.POS_CLSS
+                LEFT OUTER JOIN (SELECT CODE_NM ,CODE FROM KMDB.CODEINFO WHERE DIV_ID ='D04') TF ON TF.CODE = B.METHOD_CLSS
+				  WHERE 1=1
+      
+      
+               
+             AND  RL.DATA_ID = #{dataId}
+             AND KC.col_name = #{colName}
+	
+	</select>
+	<select id="getCollectionDataInfoCE"  parameterType="java.util.HashMap" resultType="collectionList">
+   SELECT 
+   		       DISTINCT
+   		       TA.col_name AS colName,
+   		       TA.CODE_NM AS codeNm,
+	           TC.TITLE AS dataNm,
+	           TC.PROD_YEAR_EST_YN AS prodYearYn,
+	           C1.CENSOR_NO AS dataNo,
+	           C1.REC_SITE AS acqNm,
+               C7.CODE_NM  AS acqMethod,
+               C1.REC_DATE AS acqDate,
+               C2.FILE_NM AS fileNm,
+               C6.CODE_NM AS typeClss,
+	           R1.DESCRIPTION AS description
+               FROM 
+               KMDB.CENSORSHIP_DOC C1 
+               LEFT OUTER JOIN KMDB.CENSORSHIP_DETAIL C2 ON C1.CENSOR_ID  = C2.CENSOR_DETAIL_ID 
+               LEFT OUTER JOIN KMDB.CENSORSHIP_ALL C3 ON C1.CENSOR_ID  = C3.CENSOR_ALL_ID
+               LEFT OUTER JOIN (SELECT DATA_ID,COL_ID, DATA_NO,TYPE_CLSS,DESCRIPTION FROM kmdb.KMDB_COLLECTIONS_REL ) R1  ON  TO_CHAR(C2.CENSOR_DETAIL_ID) = R1.DATA_ID
+               LEFT OUTER JOIN(SELECT MOVIE_ID, MOVIE_SEQ, TITLE,PROD_YEAR_EST_YN, COMPY_CLSS, DIRECTOR, PROD_YEAR FROM kmdb.MOVIE_SE) TC ON TC.MOVIE_ID = C3.MOVIE_ID AND TC.MOVIE_SEQ = C3.MOVIE_SEQ
+               LEFT OUTER JOIN (SELECT CODE_NM ,CODE FROM kmdb.CODEINFO WHERE DIV_ID ='K05') TA ON TA.CODE = R1.TYPE_CLSS   
+               LEFT OUTER JOIN (SELECT col_name , col_id FROM kmdb.KMDB_COLLECTIONS kc) TA ON TA.COL_ID = R1.COL_ID
+               
+               LEFT OUTER JOIN (SELECT REP_ACQ_ID, ACQ_NAME, ACQ_DATE FROM kmdb.ACQ_WHERE)TB ON TB.REP_ACQ_ID = ACQ_ID
+               LEFT OUTER JOIN (SELECT DIV_ID , CODE , CODE_NM FROM KMDB.CODEINFO WHERE DIV_ID='E07') C6 ON C6.CODE =  C1.KIND_CLSS
+               LEFT OUTER JOIN (SELECT CODE_NM  , code , div_id FROM kmdb.CODEINFO WHERE DIV_ID ='K03' ) C7 ON C7.CODE = C1.METHOD_CLSS
+               
+               WHERE 1=1
+      
+               
+             AND  R1.DATA_ID = #{dataId}	
+             AND TA.col_name = #{colName}
+	</select>
+	
+	<select id="getCollectionDataInfoBO"  parameterType="java.util.HashMap" resultType="collectionList">
+   		     SELECT 
+   			       DISTINCT
+   			     TA.col_name AS colName,
+   			     TA.CODE_NM AS codeNm,
+	             B1.BOOK_NM AS dataNm,
+                 B1.TITLE_SUB AS dataNmSub,
+                 B1.TITLE_ETC AS dataNmEtc,
+                 B1.TITLE_EQUAL AS dataNmEq,
+                 TC.CODE_NM AS typeClss,
+	             B1.BOOK_NO AS DataNo,
+	             B1.WRITER AS writer,
+	             B1.TRANSLATOR AS translator,
+                 B1.EDITOR AS editor,
+	             B1.PUB_PLACE AS pubPlace,
+	             B1.PUB_YEAR AS publishYear,
+	             B1.LANG_CLSS AS langClss,
+                 C3.CODE_NM AS keepCondition,
+                 C4.CODE_NM AS acqMethod,
+	    		 B2.REC_SITE AS acqNm,
+                 B2.REC_DATE AS acqDate,         
+	             R1.DESCRIPTION AS description
+                FROM 
+               KMDB.BOOK B1 LEFT OUTER JOIN KMDB.BOOK_DETAIL B2 ON B1.BOOK_ID =B2.BOOK_DETAIL_ID 
+               LEFT OUTER JOIN (SELECT DATA_ID,col_id, DATA_NO,TYPE_CLSS,DESCRIPTION FROM kmdb.KMDB_COLLECTIONS_REL ) R1  ON  TO_CHAR(B2.BOOK_DETAIL_ID) = R1.DATA_ID 
+               LEFT OUTER JOIN (SELECT CODE_NM ,CODE FROM kmdb.CODEINFO WHERE DIV_ID ='K05') TA ON TA.CODE = R1.TYPE_CLSS 
+               LEFT OUTER JOIN (SELECT col_name , col_id FROM kmdb.KMDB_COLLECTIONS kc) TA ON TA.COL_ID = R1.COL_ID
+               LEFT OUTER JOIN (SELECT REP_ACQ_ID, ACQ_NAME, ACQ_DATE FROM kmdb.ACQ_WHERE)TB ON TB.REP_ACQ_ID = ACQ_ID
+               LEFT OUTER JOIN (SELECT CODE_NM ,CODE FROM kmdb.CODEINFO WHERE DIV_ID ='E07') TC ON TC.CODE = B1.TYPE_CLSS
+               LEFT OUTER JOIN (SELECT CODE_NM  , code , div_id FROM kmdb.CODEINFO WHERE DIV_ID ='D21' ) C3 ON C3.CODE = B2.POS_CLSS
+               LEFT OUTER JOIN (SELECT CODE_NM  , code , div_id FROM kmdb.CODEINFO WHERE DIV_ID ='D04' ) C4 ON C4.CODE = B2.METHOD_CLSS
+               WHERE 1=1
+             AND  R1.DATA_ID =  #{dataId}
+             AND TA.col_name = #{colName}	
+	</select>
+	
+	<select id="getCollectionDataInfoAT"  parameterType="java.util.HashMap" resultType="collectionList">
+
+                   SELECT 
+                      DISTINCT
+                      TA.col_name,
+                     TA.CODE_NM,
+                 	A1.ARTICLE_NO AS dataNo,
+	             	A1.C_TITLE AS dataNm,
+	             	A1.PUB_PLACE AS pubPlace,
+	             	A1.PUB_DATE AS pubDate,
+	             	R1.DESCRIPTION AS description
+
+                FROM 
+                KMDB.ARTICLE A1 LEFT OUTER JOIN KMDB.KMDB_COLLECTIONS_REL R1 ON TO_CHAR(A1.ARTICLE_ID)  = R1.DATA_ID
+                LEFT OUTER JOIN (SELECT CODE_NM ,CODE FROM kmdb.CODEINFO WHERE DIV_ID ='K05') TA ON TA.CODE = R1.TYPE_CLSS
+                LEFT OUTER JOIN (SELECT col_name , col_id FROM kmdb.KMDB_COLLECTIONS kc) TA ON TA.COL_ID = R1.COL_ID
+               WHERE 1=1
+               AND  R1.DATA_ID = #{dataId}	
+               AND TA.col_name = #{colName}
+	</select>
+	
+    <select id="getCollectionDataInfoEQ" parameterType="java.util.HashMap" resultType="collectionList">
+	SELECT
+        A.TITLE AS dataNm
+      , A.TITLE_SUB AS dataNmSub
+  	  , KC.col_name AS colName
+      , A.TITLE_ETC AS dataNmEtc
+      , A.TITLE_EQUAL AS dataNmEq
+      , A.EQUIP_NO AS dataNo
+      , TA.CODE_NM AS degreeClss
+      , TB.CODE_NM AS degreeClss2
+      , A.COMPONENT AS component
+      , A.EQUIP_CONTENT AS content
+      , TC.CODE_NM AS keepCondition
+      , B.REC_SITE AS acqNm
+      , TD.CODE_NM AS acqMethod
+      , B.REC_DATE AS acqDate
+      , RL.DESCRIPTION AS description
+      
+      FROM kmdb.EQUIPMENT A
+        LEFT OUTER JOIN KMDB.EQUIP_DETAIL B ON B.EQUIP_ID = A.EQUIP_ID
+        LEFT OUTER JOIN KMDB.KMDB_COLLECTIONS_REL RL ON TO_CHAR(A.EQUIP_ID)  = RL.DATA_ID
+        LEFT OUTER JOIN (SELECT COL_NAME , COL_ID FROM KMDB.KMDB_COLLECTIONS ) KC ON KC.COL_ID = RL.COL_ID
+     
+
+ 
+
+        LEFT OUTER JOIN (SELECT CODE_NM ,CODE FROM KMDB.CODEINFO WHERE DIV_ID ='L07') TA ON TA.CODE = A.DIV1_CLSS
+        LEFT OUTER JOIN (SELECT CODE_NM ,CODE FROM KMDB.CODEINFO WHERE DIV_ID ='L02') TB ON TB.CODE = A.DIV2_CLSS  
+        LEFT OUTER JOIN (SELECT CODE_NM ,CODE FROM KMDB.CODEINFO WHERE DIV_ID ='D21') TC ON TC.CODE = B.POS_ClSS
+        LEFT OUTER JOIN (SELECT CODE_NM ,CODE FROM KMDB.CODEINFO WHERE DIV_ID ='K03') TD ON TD.CODE = B.METHOD_CLSS
+
+        WHERE 1 = 1
+        AND RL.data_id = #{dataId}
+         AND KC.col_name = #{colName}
+	
+	</select>
+	
+	<select id="getCollectionDataInfoFI" parameterType="java.util.HashMap" resultType="collectionList">
+		SELECT
+        DISTINCT
+          TA.PROD_YEAR_EST_YN AS prodYearYn
+        , KC.col_name AS colName
+        ,  KC.COL_ID
+        , TA.CODE_NM
+        , TA.TITLE AS dataNm
+        , TC.CODE_NM AS filmGyugek
+        , TD.CODE_NM AS filmGubun
+        , A.F_IO_CODE AS dataNo
+        , TA.COMPY_CLSS AS producer
+        , TA.DIRECTOR AS director
+        , TA.PROD_YEAR AS createYear
+        , TE.CODE_NM AS colorClss
+        , TF.CODE_NM AS screenClss
+        , TG.CODE_NM AS soundClss
+        , A.F_RUNTIME AS runtime
+        , A.F_LANG AS langClss
+        , A.F_JAMAK AS capClss
+        , TH.CODE_NM AS useClss
+        , RL.DESCRIPTION AS description
+       
+    
+        FROM kmdb.F_SET A
+       
+        LEFT OUTER JOIN(SELECT MOVIE_ID, MOVIE_SEQ, COMPY_CLSS,TITLE, DIRECTOR, PROD_YEAR ,PROD_YEAR_EST_YN FROM KMDB.MOVIE_SE) TA ON TA.MOVIE_ID = A.MOVIE_ID AND TA.MOVIE_SEQ = A.MOVIE_SEQ
+        LEFT OUTER JOIN(SELECT MOVIE_ID, MOVIE_SEQ, F_SCREEN FROM KMDB.F_MAIN) TB ON TB.MOVIE_ID = A.MOVIE_ID AND TB.MOVIE_SEQ = A.MOVIE_SEQ
+        LEFT OUTER JOIN KMDB.KMDB_COLLECTIONS_REL RL ON TO_CHAR(A.MOVIE_ID)  = RL.DATA_ID
+        LEFT OUTER JOIN (SELECT COL_NAME , COL_ID FROM KMDB.KMDB_COLLECTIONS ) KC ON KC.COL_ID = RL.COL_ID
+        LEFT OUTER JOIN (SELECT CODE_NM ,CODE FROM KMDB.CODEINFO WHERE DIV_ID ='K05') TA ON TA.CODE = RL.TYPE_CLSS
+        LEFT OUTER JOIN (SELECT CODE_NM ,CODE FROM KMDB.CODEINFO WHERE DIV_ID ='B01') TC ON TC.CODE = A.F_UNIT
+        LEFT OUTER JOIN (SELECT CODE_NM ,CODE FROM KMDB.CODEINFO WHERE DIV_ID ='B02') TD ON TD.CODE = A.F_ITEM
+        LEFT OUTER JOIN (SELECT CODE_NM ,CODE FROM KMDB.CODEINFO WHERE DIV_ID ='B20') TE ON TE.CODE = A.F_COLOR
+        LEFT OUTER JOIN (SELECT CODE_NM ,CODE FROM KMDB.CODEINFO WHERE DIV_ID ='B03') TF ON TF.CODE = TB.F_SCREEN
+        LEFT OUTER JOIN (SELECT CODE_NM ,CODE FROM KMDB.CODEINFO WHERE DIV_ID ='B04') TG ON TG.CODE = A.F_SOUND
+        LEFT OUTER JOIN (SELECT CODE_NM ,CODE FROM KMDB.CODEINFO WHERE DIV_ID ='B17') TH ON TH.CODE = A.F_USED_DIV
+
+        where 1 = 1
+      
+   
+        AND RL.data_id =  #{dataId}
+        AND A.OPEN_YN = 'Y'
+        AND  KC.col_name = #{colName}
+	
+	</select>
+	
+	<select id="getCollectionDataInfoDC" parameterType="java.util.HashMap" resultType="collectionList">
+	SELECT
+		TA.PROD_YEAR_EST_YN AS prodYearYn,
+		TA.col_name AS colName,
+         TA.TITLE  AS dataNm,
+         TA.CODE_NM AS codeNm
+       , TB.CODE_NM AS formClss
+       , TH.CODE_NM AS screenClss
+       , A.D_MAIN_NO AS dataNo
+       , TA.COMPY_CLSS AS producer
+       , TA.DIRECTOR AS director
+       , TA.PROD_YEAR AS createYear
+       , TC.CODE_NM AS degreeClss
+       , TD.CODE_NM AS screenSize
+       , TE.CODE_NM AS pictureRatio
+       , TF.CODE_NM AS colorClss
+       , B.SUBTITLE_CLSS AS capClss
+       , B.REC_SITE AS acqNm
+       , B.REC_DATE AS acqDate
+       , R1.DESCRIPTION AS description
+       , B.OPEN_YN AS openYn
+       FROM KMDB.DCINEMA_MAIN A
+      
+       LEFT OUTER JOIN(SELECT MOVIE_ID, MOVIE_SEQ, TITLE, COMPY_CLSS, DIRECTOR, PROD_YEAR,PROD_YEAR_EST_YN FROM kmdb.MOVIE_SE) TA ON TA.MOVIE_ID = A.MOVIE_ID AND TA.MOVIE_SEQ = A.MOVIE_SEQ
+       LEFT OUTER JOIN(SELECT D_MAIN_ID, CLASS_CLSS, SCREEN_SIZE, PICTURE_RATIO, COLOR_MODE, SUBTITLE_CLSS, REC_SITE, REC_DATE ,OPEN_YN  FROM kmdb.DCINEMA_DETAIL) B ON B.D_MAIN_ID = A.D_MAIN_ID
+       LEFT OUTER JOIN (SELECT COL_ID, DATA_ID, DATA_NO,TYPE_CLSS,DESCRIPTION FROM KMDB.KMDB_COLLECTIONS_REL ) R1 ON R1.DATA_ID = TO_CHAR(B.D_MAIN_ID)
+ 		 LEFT OUTER JOIN (SELECT col_name , col_id FROM kmdb.KMDB_COLLECTIONS kc) TA ON TA.COL_ID = R1.COL_ID
+       LEFT OUTER JOIN (SELECT CODE_NM ,CODE FROM KMDB.CODEINFO WHERE DIV_ID ='K05') TG ON TG.CODE = R1.TYPE_CLSS
+        LEFT OUTER JOIN (SELECT CODE_NM ,CODE FROM kmdb.CODEINFO WHERE DIV_ID ='K05') TA ON TA.CODE = R1.TYPE_CLSS  
+       LEFT OUTER JOIN (SELECT CODE_NM ,CODE FROM KMDB.CODEINFO WHERE DIV_ID ='DC01') TB ON TB.CODE = A.FORM_CLSS
+       LEFT OUTER JOIN (SELECT CODE_NM ,CODE FROM KMDB.CODEINFO WHERE DIV_ID ='DC32') TC ON TC.CODE = B.CLASS_CLSS
+       LEFT OUTER JOIN (SELECT CODE_NM ,CODE FROM KMDB.CODEINFO WHERE DIV_ID ='DC04') TD ON TD.CODE = B.SCREEN_SIZE
+       LEFT OUTER JOIN (SELECT CODE_NM ,CODE FROM KMDB.CODEINFO WHERE DIV_ID ='DC05') TE ON TE.CODE = B.PICTURE_RATIO    
+       LEFT OUTER JOIN (SELECT CODE_NM ,CODE FROM KMDB.CODEINFO WHERE DIV_ID ='DC08') TF ON TF.CODE = B.COLOR_MODE
+       LEFT OUTER JOIN (SELECT CODE_NM ,CODE FROM KMDB.CODEINFO WHERE DIV_ID ='DC16') TH ON TH.CODE = A.SCREEN_CLSS
+       where 1 =1
+       
+
+
+        AND R1.data_id =  #{dataId}
+        AND TA.col_name =  #{colName}
+	
+	
+	</select>
+	
+	<select id="getrelationShipCollectionTitle" resultType="collectionList" parameterType="String">
+	    
+		SELECT
+    	    A.COL_ID AS colId
+    	,   A.DATA_ID AS dataId
+    	,   B.COL_NAME AS colName
+    	From KMDB.KMDB_COLLECTIONS_REL A
+         LEFT OUTER JOIN (SELECT COL_ID, COL_NAME FROM KMDB.KMDB_COLLECTIONS) B ON A.COL_ID = B.COL_ID
+         
+   		 WHERE A.DATA_ID = #{dataId,jdbcType=VARCHAR}
+   		 
+   		 
+	
+	</select>
+ 	
+</mapper>
